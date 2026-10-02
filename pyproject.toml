@@ -22,6 +22,7 @@ dependencies = [
 [project.optional-dependencies]
 dashboard = ["streamlit>=1.35", "plotly>=5.22", "networkx>=3.3"]
 taming = ["ipca>=0.1.2"]
+viz = ["plotly>=5.22", "kaleido>=1.0", "imageio>=2.34"]
 dev = ["pytest>=8.2", "pytest-cov>=5.0", "ruff>=0.5", "black>=24.4"]
 
 [project.scripts]
@@ -39,6 +40,7 @@ testpaths = ["tests"]
 addopts = "-m 'not network'"
 markers = [
     "network: tests that make real HTTP calls to live data sources (run with -m network)",
+    "leakage: point-in-time / look-ahead-bias leakage tests (build guide Section 8)",
 ]
 
 [tool.ruff]

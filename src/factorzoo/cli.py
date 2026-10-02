@@ -245,6 +245,20 @@ def compute_factors_cmd(
     con.close()
 
 
+@app.command("make-figures")
+def make_figures_cmd() -> None:
+    """Generate the README proof-of-work figures (docs/img/*.png + GIF,
+    docs/interactive/*.html) from whatever real data is currently in the
+    point-in-time store. Figures whose inputs don't exist yet are skipped
+    and reported, not faked -- see viz/readme_figures.py's module docstring.
+    Exits nonzero only if the core tables (universe, EDGAR facts) are
+    missing entirely; a price-data gap is an expected, reported skip.
+    """
+    from factorzoo.viz import readme_figures
+
+    raise typer.Exit(readme_figures.main())
+
+
 @app.command("status")
 def status_cmd() -> None:
     """Data-health report -- the human-readable version of Phase 1's gate."""

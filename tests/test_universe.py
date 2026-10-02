@@ -87,6 +87,7 @@ class TestPointInTimeMembers:
         assert "CCC" in point_in_time_members(history, "2020-01-01")
         assert "CCC" not in point_in_time_members(history, "2025-01-01")
 
+    @pytest.mark.leakage
     def test_no_future_leakage_into_a_past_as_of_date(self, history):
         # The universe as of 1996 cannot possibly include DDD, which
         # doesn't exist until 2020. A naive "current constituents" source

@@ -60,6 +60,7 @@ class TestBuildPointInTimeSnapshot:
         assert row["assets"] == 1200.0
         assert row["assets_prior"] == 1000.0
 
+    @pytest.mark.leakage
     def test_future_fact_not_yet_available_is_excluded(self, con):
         # The more recent Assets fact is NOT yet available as of the query
         # date -- the snapshot must not leak it in.
@@ -75,6 +76,7 @@ class TestBuildPointInTimeSnapshot:
         assert row["assets"] == 1000.0
         assert pd.isna(row.get("assets_prior"))  # only one year known yet
 
+    @pytest.mark.leakage
     def test_amendment_available_later_supersedes_original_once_available(self, con):
         original = _fact("E1", "Assets", 1000.0, None, "2023-12-31", "2024-02-15", "A1")
         amended = _fact(

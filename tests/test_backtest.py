@@ -32,6 +32,7 @@ def _informative_panel(n_dates=36, n_names=200, seed=0) -> dict:
     return panel
 
 
+@pytest.mark.leakage
 class TestShuffleFactorWithinDate:
     def test_shuffled_values_are_a_permutation_of_the_original_within_each_date(self):
         panel = _informative_panel(n_dates=3, n_names=50)
@@ -55,6 +56,7 @@ class TestShuffleFactorWithinDate:
         assert not np.allclose(a[date]["my_factor"].to_numpy(), b[date]["my_factor"].to_numpy())
 
 
+@pytest.mark.leakage
 class TestRunShuffleTest:
     def test_informative_factor_passes(self):
         panel = _informative_panel()

@@ -86,6 +86,7 @@ class TestWriteXbrlFacts:
         assert set(rows["accn"]) == {"0001-ORIGINAL", "0002-AMENDED"}
 
 
+@pytest.mark.leakage
 class TestGetFactsAsOf:
     """The leakage-blocking query itself."""
 

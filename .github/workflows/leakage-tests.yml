@@ -1,0 +1,30 @@
+name: Leakage tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  leakage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install project
+        run: uv sync --all-extras
+
+      - name: Leakage / point-in-time tests only (build guide Section 8)
+        # The subset of the suite that directly checks for look-ahead bias:
+        # the shuffle test, available_date gating in get_facts_as_of and
+        # the point-in-time snapshot, and universe membership leakage.
+        # Split into its own workflow (rather than just a step in ci.yml)
+        # so this gets its own pass/fail badge in the README.
+        run: uv run pytest -v -m leakage
