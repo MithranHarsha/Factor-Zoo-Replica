@@ -19,18 +19,22 @@ jobs:
         run: uv python install 3.12
 
       - name: Install project
-        # All extras, not just [dev]: test_dashboard_data.py needs streamlit
-        # (dashboard) and test_ipca_model.py needs the ipca package (taming) --
-        # CI installing a narrower set than what the test suite imports would
-        # pass locally and fail here for a reason that has nothing to do with
-        # the code under test.
-        run: uv pip install --system -e ".[dev,dashboard,taming]"
+        # uv sync (not `uv pip install -e`) actually reads uv.lock, which is
+        # also what makes astral-sh/setup-uv's cache-dependency-glob
+        # (**/uv.lock) resolve to something -- without a committed lockfile
+        # that glob matches nothing and the action fails before a single
+        # dependency installs. --all-extras: test_dashboard_data.py needs
+        # streamlit (dashboard) and test_ipca_model.py needs the ipca
+        # package (taming), so a narrower install would pass locally and
+        # fail here for a reason that has nothing to do with the code under
+        # test.
+        run: uv sync --all-extras
 
       - name: Lint
-        run: ruff check src tests
+        run: uv run ruff check src tests
 
       - name: Offline tests (leakage tests, schema tests, point-in-time rule)
         # Network-marked tests (live EDGAR/Stooq/Yahoo/French pulls) are
         # excluded by default via pyproject.toml's addopts -- CI should not
         # depend on third-party uptime or rate limits to pass or fail.
-        run: pytest -v --cov=factorzoo --cov-report=term-missing
+        run: uv run pytest -v --cov=factorzoo --cov-report=term-missing
