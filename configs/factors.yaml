@@ -1,0 +1,10 @@
+# Factor registry configuration -- owned by Phase 2 (Core Factor Library,
+# build guide Section 10). Left as a placeholder in Phase 1 so the config
+# directory's shape is settled before the factor code lands, rather than
+# bolted on afterward.
+#
+# Expected shape once Phase 2 lands: one entry per factor in
+# src/factorzoo/factors/registry.py's FACTOR_REGISTRY, with an `active:
+# true/false` flag so a pilot run can exercise a subset of the 48-factor
+# starter library without editing code.
+active_factors: []

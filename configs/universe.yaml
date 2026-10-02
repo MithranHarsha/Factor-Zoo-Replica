@@ -1,0 +1,37 @@
+# Universe construction parameters (build guide Section 4).
+#
+# membership_source: the primary, point-in-time source of which tickers
+# were investable in which month. SEC's company_tickers.json is
+# deliberately NOT listed here as a source -- it is a current-filers-only
+# list and is used downstream (see entity_crosswalk) purely as a CIK
+# lookup, never as the universe itself.
+membership_source:
+  name: "fja05680/sp500 historical S&P 500 constituents"
+  url: "https://raw.githubusercontent.com/fja05680/sp500/master/sp500_ticker_start_end.csv"
+  scope_note: >
+    Free-data proxy universe: S&P 500 historical membership (1996-present),
+    not CRSP's full universe. Documented narrower scope, not hidden -- see
+    build guide Section 4.
+
+panel:
+  start: "1996-01-31"
+  rebalance_freq: "ME"  # month-end, matches the factor library's monthly/annual cadence
+
+# Minimum filters applied at formation date (build guide Section 4).
+# NOT YET ENFORCED as of Phase 1: price- and history-based filters need
+# daily price history, which is currently blocked for automated, no-key
+# pulls (see data/prices.py's module docstring -- both Stooq and Yahoo
+# returned errors live during this build). These parameters are recorded
+# here so Phase 3's portfolio construction has one place to read them from
+# once a working price source is wired in, rather than inventing the
+# numbers again later.
+filters:
+  min_price_usd: 1.0
+  min_months_of_history: 24
+  allowed_exchanges: ["NYSE", "NASDAQ", "AMEX"]
+  exclude_adrs: true
+  exclude_closed_end_funds: true
+
+# Financial-firm exclusion is per-factor, not universe-wide -- see
+# build guide Section 6 and src/factorzoo/factors/registry.py (Phase 2).
+financial_firm_sic_range: [6000, 6999]

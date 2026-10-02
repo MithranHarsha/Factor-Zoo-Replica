@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install project
+        # All extras, not just [dev]: test_dashboard_data.py needs streamlit
+        # (dashboard) and test_ipca_model.py needs the ipca package (taming) --
+        # CI installing a narrower set than what the test suite imports would
+        # pass locally and fail here for a reason that has nothing to do with
+        # the code under test.
+        run: uv pip install --system -e ".[dev,dashboard,taming]"
+
+      - name: Lint
+        run: ruff check src tests
+
+      - name: Offline tests (leakage tests, schema tests, point-in-time rule)
+        # Network-marked tests (live EDGAR/Stooq/Yahoo/French pulls) are
+        # excluded by default via pyproject.toml's addopts -- CI should not
+        # depend on third-party uptime or rate limits to pass or fail.
+        run: pytest -v --cov=factorzoo --cov-report=term-missing
