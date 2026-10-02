@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 
 
@@ -39,6 +40,23 @@ def register(spec: FactorSpec) -> FactorSpec:
 
 def factors_by_category(category: str) -> list[FactorSpec]:
     return [f for f in FACTOR_REGISTRY.values() if f.category == category]
+
+
+def summarize_values(values: pd.Series) -> dict:
+    """Median, not mean, and infinities treated as missing. Several
+    ratio-style factors (percent operating accruals, O-Score, R&D-to-
+    sales) can have a near-zero or exactly-zero denominator for a handful
+    of companies -- real pulled data surfaced this directly: one bad
+    denominator sent percent_operating_accruals' mean to -5327 and
+    rd_to_sales' mean to +inf across an otherwise sane 296-company panel.
+    A single extreme ratio is exactly what a mean is not robust to; a
+    divide-by-zero result also isn't a real economic number, so it's
+    dropped the same way a NaN would be rather than left to corrupt the
+    statistic.
+    """
+    clean = values.replace([np.inf, -np.inf], np.nan)
+    n_valid = int(clean.notna().sum())
+    return {"n_valid": n_valid, "median": float(clean.median()) if n_valid else None}
 
 
 def registry_summary() -> pd.DataFrame:

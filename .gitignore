@@ -18,6 +18,13 @@ data/*.parquet
 *.duckdb
 *.duckdb.wal
 
+# Exception: the small (35MB), curated 80-company snapshot committed for
+# a fresh dashboard deploy (e.g. Streamlit Community Cloud) to bootstrap
+# from -- see dashboard/app.py's _bootstrap_from_demo_snapshot_if_needed.
+# This is real, deliberately-tracked data, not a regenerable build
+# artifact like everything else *.duckdb excludes above.
+!demo/factorzoo_demo.duckdb
+
 # OS / editor
 .DS_Store
 .vscode/

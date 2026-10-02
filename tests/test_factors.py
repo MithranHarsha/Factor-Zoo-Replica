@@ -272,3 +272,36 @@ class TestHandComputedSpotChecks:
         panel = _synthetic_monthly_panel(n_months=13)
         result = f.momentum.industry_momentum.compute(panel)  # no sic column attached
         assert result.isna().all()
+
+
+class TestSummarizeValues:
+    """Found via real pulled data, not a hypothetical: percent_operating_accruals'
+    mean hit -5327 and rd_to_sales' mean hit +inf across an otherwise sane
+    296-company panel, both driven by a single company with a near-zero
+    denominator. summarize_values is the fix -- median, with infinities
+    treated as missing.
+    """
+
+    def test_median_used_instead_of_mean(self):
+        # A single extreme outlier should barely move the median, unlike
+        # the mean, which an outlier like this would dominate.
+        values = pd.Series([0.01, 0.02, 0.015, 0.018, 10_000.0])
+        result = f.registry.summarize_values(values)
+        assert result["median"] == pytest.approx(0.018)
+
+    def test_infinite_values_treated_as_missing(self):
+        values = pd.Series([0.01, 0.02, np.inf, -np.inf, 0.015])
+        result = f.registry.summarize_values(values)
+        assert result["n_valid"] == 3
+        assert np.isfinite(result["median"])
+
+    def test_all_infinite_or_nan_returns_none(self):
+        values = pd.Series([np.inf, -np.inf, np.nan])
+        result = f.registry.summarize_values(values)
+        assert result["n_valid"] == 0
+        assert result["median"] is None
+
+    def test_empty_series_returns_none_not_an_error(self):
+        result = f.registry.summarize_values(pd.Series([], dtype="float64"))
+        assert result["n_valid"] == 0
+        assert result["median"] is None

@@ -211,6 +211,7 @@ def compute_factors_cmd(
     ensure_data_dirs()
     import factorzoo.factors as f
     from factorzoo.factors.panel import get_annual_factor_panel
+    from factorzoo.factors.registry import summarize_values
 
     con = pit_store.init_db()
     as_of_ts = pd.Timestamp(as_of) if as_of else pd.Timestamp.today()
@@ -225,15 +226,15 @@ def compute_factors_cmd(
         try:
             values = spec.compute(panel)
         except Exception as exc:  # noqa: BLE001 -- surfaced as a per-factor row, not a crash
-            rows.append({"factor": spec.name, "category": spec.category, "n_valid": 0, "mean": None, "error": repr(exc)})
+            rows.append({"factor": spec.name, "category": spec.category, "n_valid": 0, "median": None, "error": repr(exc)})
             continue
-        n_valid = int(values.notna().sum())
+        summary = summarize_values(values)
         rows.append(
             {
                 "factor": spec.name,
                 "category": spec.category,
-                "n_valid": n_valid,
-                "mean": float(values.mean()) if n_valid else None,
+                "n_valid": summary["n_valid"],
+                "median": summary["median"],
                 "error": None,
             }
         )

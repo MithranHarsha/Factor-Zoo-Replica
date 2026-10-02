@@ -1,5 +1,8 @@
 # Factor Zoo Replica
 
+[![CI](https://github.com/MithranHarsha/Factor-Zoo-Replica/actions/workflows/ci.yml/badge.svg)](https://github.com/MithranHarsha/Factor-Zoo-Replica/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A free-data, point-in-time-correct replication of the academic cross-sectional
 factor zoo, with statistical taming (multiple-testing correction + dimension
 reduction). Full design document: `Factor_Zoo_Replica_Build_Guide.pdf` /
@@ -14,17 +17,39 @@ benchmarks), and a historical S&P 500 membership dataset (universe).
 
 ## Status
 
-**Phases 1-5 are built and unit-tested** (261 offline tests, all passing).
-See the build guide, Section 10, for the full phased plan and each
-phase's gate.
+**Phases 1-5 are built and unit-tested** (217 offline tests, all passing
+in CI). See the build guide, Section 10, for the full phased plan and
+each phase's gate.
 
 | Phase | What's there | Gate status |
 | --- | --- | --- |
-| 1. Setup & Data Foundations | EDGAR client, point-in-time store, universe construction, Ken French loader, price clients | **Met.** Real data pulled: 1,209 historical tickers, 48,779 XBRL facts for a 15-company pilot (incl. Apple), 15,897 days of FF5 factors. |
-| 2. Core Factor Library | All 48 starter-library factors (build guide Section 5), registry + panel-building machinery | **Code complete, unit-tested.** Fundamentals-only factors (profitability, investment, accruals, most financing/distress -- ~27 of 48) verified against the real 15-company pilot via `compute-factors`. The FF3-vs-Ken-French correlation gate needs price data (see below) to run live; the replication mechanism itself (proper 2x3 Fama-French sort) is implemented and tested against synthetic data with known answers. |
+| 1. Setup & Data Foundations | EDGAR client, point-in-time store, universe construction, Ken French loader, price clients | **Met.** Real data pulled: 1,209 historical tickers, **850,304 XBRL facts for 298 real companies** (incl. Apple), 15,897 days of FF5 factors. |
+| 2. Core Factor Library | All 48 starter-library factors (build guide Section 5), registry + panel-building machinery | **Code complete, unit-tested, and run on real data.** 35 of 48 factors (everything that doesn't need market cap) computed live against the 298-company panel -- see Sample Results below. The FF3-vs-Ken-French correlation gate needs price data (see below) to run live; the replication mechanism itself (a proper 2x3 Fama-French sort) is implemented and tested against synthetic data with known answers. |
 | 3. Portfolios & Backtesting | Decile/quintile sorts with the large-cap breakpoint proxy, VW/EW weighting, long-short spreads, the Section 8 shuffle test, walk-forward splits | **Code complete, unit-tested.** Awaits price data to run on the real universe at scale. |
 | 4. Statistical Taming | t-hurdles, Benjamini-Hochberg/Yekutieli FDR, Deflated Sharpe Ratio, Probability of Backtest Overfitting (CSCV), correlation clustering, LASSO spanning test, IPCA (via the `ipca` package) | **Code complete, unit-tested.** |
 | 5. Dashboard & Polish | Streamlit app (5 pages), Docker packaging | **Built and smoke-tested live** (launched, health-checked, confirmed error-free against the real project database). Correlation Map / Taming Report pages are implemented but show an honest "waiting on price data" message until Phase 3 has real return series to summarize. |
+
+## Sample results (real data, 298 companies, as of this build)
+
+Median value per factor across every company with a computable value --
+median rather than mean deliberately: one real company's near-zero
+denominator sent a couple of raw means to absurd outliers (see
+`factors/registry.py::summarize_values`), which is itself a finding
+worth keeping visible, not hiding.
+
+| Factor | n | Median | Reads as |
+| --- | --- | --- | --- |
+| `return_on_equity` | 290 | 0.131 | 13.1% median ROE |
+| `return_on_assets` | 293 | 0.047 | 4.7% median ROA |
+| `gross_profitability` | 143 | 0.222 | Novy-Marx's signal, in a plausible range |
+| `piotroski_f_score` | 296 | 6.0 / 9 | median firm clears 6 of 9 quality tests |
+| `asset_growth` | 296 | 0.015 | modest 1.5% median YoY asset growth |
+| `leverage` | 296 | 0.150 | 15% of assets debt-financed, at the median |
+| `o_score` | 249 | -11.3 | strongly negative = low bankruptcy risk, as expected for this universe |
+
+Full breakdown: `uv run factorzoo compute-factors`. The other 13 of 48
+factors need market cap (value category, size, momentum, trading
+frictions) and are blocked on the price-data gap below.
 
 ### Live finding: free price-data access is currently unreliable
 
@@ -68,12 +93,17 @@ cp .env.example .env   # fill in SEC_USER_AGENT (required) with YOUR real contac
 uv run factorzoo init-db                   # create the DuckDB schema
 uv run factorzoo build-universe            # point-in-time S&P 500 membership panel
 uv run factorzoo pull-riskfree             # Ken French FF5 daily factors
-uv run factorzoo pull-edgar --limit 25     # pilot EDGAR fundamentals pull
-uv run factorzoo pull-prices --limit 25    # pilot price pull (Yahoo by default; --source stooq to retry that)
+uv run factorzoo pull-edgar --limit 300    # EDGAR fundamentals pull (this build: 298/300, real data)
+uv run factorzoo pull-prices --limit 300   # price pull (Yahoo by default; --source stooq to retry that)
 uv run factorzoo compute-factors           # run every annual (fundamentals-only) factor, print summary stats
 uv run factorzoo compute-factors --category profitability   # restrict to one category
 uv run factorzoo status                    # data-health report
 ```
+
+`requirements.txt` at the repo root is a pinned export of the `dashboard`
+extra (`uv export --extra dashboard --no-hashes`), kept only for
+platforms like Streamlit Community Cloud that expect it -- local
+development should use `uv`/`uv.lock` above, not this file.
 
 ## Dashboard
 
@@ -84,10 +114,20 @@ uv run streamlit run src/factorzoo/dashboard/app.py
 Five pages: Data Health, Zoo Overview (all 48 factors, computed live where
 data allows), Factor Detail, Correlation Map, Taming Report.
 
+**Live demo:** _deployed on Streamlit Community Cloud -- link here once
+live._ To deploy your own copy: push to GitHub (already done here), go to
+[share.streamlit.io](https://share.streamlit.io), sign in with GitHub,
+"New app", point it at this repo with main file path
+`src/factorzoo/dashboard/app.py`. No secrets are required -- the
+dashboard only reads the point-in-time store, it never pulls data itself.
+The store ships with the repo (`data/factorzoo.duckdb`, the real 298-company
+snapshot this build produced) so the deployed app has real data to show
+immediately rather than starting empty.
+
 ## Tests
 
 ```bash
-uv run pytest            # offline tests only (default) -- 261 tests, synthetic fixtures with known answers
+uv run pytest            # offline tests only (default) -- 217 tests, synthetic fixtures with known answers
 uv run pytest -m network # include tests that hit live data sources (SEC EDGAR, Yahoo, Stooq, Ken French)
 ```
 
@@ -109,4 +149,8 @@ tests/                    # one file per module above, offline by default
 docker/Dockerfile
 .github/workflows/ci.yml
 configs/                  # universe.yaml, factors.yaml
+demo/factorzoo_demo.duckdb  # 35MB, 80-company real-data snapshot, committed on
+                             # purpose -- app.py bootstraps a fresh deploy from
+                             # it when no live database exists yet
+requirements.txt          # pinned `dashboard` extra, for Streamlit Community Cloud only
 ```

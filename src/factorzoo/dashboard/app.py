@@ -10,10 +10,13 @@ Run with: uv run streamlit run src/factorzoo/dashboard/app.py
 
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
 import plotly.express as px
 import streamlit as st
 
-from factorzoo.config import ensure_data_dirs
+from factorzoo.config import DB_PATH, ensure_data_dirs
 from factorzoo.dashboard.data import (
     compute_zoo_overview,
     factor_detail,
@@ -24,10 +27,26 @@ from factorzoo.data import pit_store
 
 st.set_page_config(page_title="Factor Zoo Replica", layout="wide")
 
+# A small (35MB, 80-company), real-data snapshot committed at this path
+# specifically for a fresh deploy (e.g. Streamlit Community Cloud) that
+# has no persistent volume and so starts with no point-in-time store at
+# all. On a machine that's actually run the CLI pull commands, DB_PATH
+# already exists and this is a no-op -- local development is unaffected.
+DEMO_SNAPSHOT_PATH = Path(__file__).resolve().parents[3] / "demo" / "factorzoo_demo.duckdb"
+
+
+def _bootstrap_from_demo_snapshot_if_needed() -> None:
+    if DB_PATH.exists():
+        return
+    if DEMO_SNAPSHOT_PATH.exists():
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(DEMO_SNAPSHOT_PATH, DB_PATH)
+
 
 @st.cache_resource
 def get_connection():
     ensure_data_dirs()
+    _bootstrap_from_demo_snapshot_if_needed()
     return pit_store.init_db()
 
 

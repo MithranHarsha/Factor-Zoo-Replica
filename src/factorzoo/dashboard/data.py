@@ -11,6 +11,7 @@ import pandas as pd
 
 import factorzoo.factors as f
 from factorzoo.factors.panel import get_annual_factor_panel
+from factorzoo.factors.registry import summarize_values
 
 DATA_HEALTH_QUERIES: dict[str, str] = {
     "xbrl_facts": "SELECT COUNT(*) FROM xbrl_facts",
@@ -49,7 +50,7 @@ def compute_zoo_overview(con: duckdb.DuckDBPyConnection, as_of: str | pd.Timesta
             rows.append(
                 {
                     "factor": spec.name, "category": spec.category, "direction": spec.direction,
-                    "n_valid": None, "mean": None, "status": "needs price data",
+                    "n_valid": None, "median": None, "status": "needs price data",
                 }
             )
             continue
@@ -57,25 +58,25 @@ def compute_zoo_overview(con: duckdb.DuckDBPyConnection, as_of: str | pd.Timesta
             rows.append(
                 {
                     "factor": spec.name, "category": spec.category, "direction": spec.direction,
-                    "n_valid": 0, "mean": None, "status": "no fundamentals pulled yet",
+                    "n_valid": 0, "median": None, "status": "no fundamentals pulled yet",
                 }
             )
             continue
         try:
             values = spec.compute(panel)
-            n_valid = int(values.notna().sum())
+            summary = summarize_values(values)
             rows.append(
                 {
                     "factor": spec.name, "category": spec.category, "direction": spec.direction,
-                    "n_valid": n_valid, "mean": float(values.mean()) if n_valid else None,
-                    "status": "ok" if n_valid else "no data for this universe",
+                    "n_valid": summary["n_valid"], "median": summary["median"],
+                    "status": "ok" if summary["n_valid"] else "no data for this universe",
                 }
             )
         except Exception as exc:  # noqa: BLE001 -- surfaced in the table, not a crashed page
             rows.append(
                 {
                     "factor": spec.name, "category": spec.category, "direction": spec.direction,
-                    "n_valid": 0, "mean": None, "status": f"error: {exc}",
+                    "n_valid": 0, "median": None, "status": f"error: {exc}",
                 }
             )
     return pd.DataFrame(rows).sort_values(["category", "factor"]).reset_index(drop=True)
