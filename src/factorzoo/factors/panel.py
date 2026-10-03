@@ -207,6 +207,16 @@ def attach_market_cap(
     if price_source:
         params.append(price_source)
 
+    # entity_crosswalk can have more than one ticker per entity_id --
+    # confirmed live with real data: Alphabet (GOOG/GOOGL) and Fox
+    # (FOX/FOXA) each file as one CIK under multiple share classes. A
+    # plain join fans that out to multiple price rows per entity_id,
+    # which downstream silently double- (or quadruple-, once this merges
+    # back into a multi-ticker caller) counts that one company's
+    # fundamentals in any cross-sectional sort. QUALIFY picks exactly one
+    # ticker per entity_id, deterministically (alphabetically first --
+    # for both real cases found so far that's also the unsuffixed, more
+    # commonly quoted class).
     price_q = f"""
         SELECT c.entity_id, p.close AS price_at_formation
         FROM entity_crosswalk c
@@ -216,6 +226,7 @@ def attach_market_cap(
             WHERE p2.entity_id_hint = c.ticker AND p2.date <= ? {source_filter.replace('p.', 'p2.')}
         )
         {source_filter}
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY c.entity_id ORDER BY c.ticker) = 1
     """
     prices = con.execute(price_q, params + ([price_source] if price_source else [])).fetchdf()
 

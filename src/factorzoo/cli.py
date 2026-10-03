@@ -138,13 +138,19 @@ def pull_edgar_cmd(
 @app.command("pull-prices")
 def pull_prices_cmd(
     limit: int = typer.Option(25, help="Number of tickers to pull"),
-    source: str = typer.Option("yahoo", help="'yahoo' (default, free/no key) or 'stooq' (currently blocked)"),
+    source: str = typer.Option(
+        "yahoo",
+        help="'yahoo' (default, free/no key), 'tiingo' (free tier, needs TIINGO_API_KEY, "
+        "500 distinct symbols/month), or 'stooq' (currently blocked)",
+    ),
     as_of: str = typer.Option(None),
 ) -> None:
     """Pull daily price history for a pilot slice of the current universe.
 
-    Default source is Yahoo Finance's chart API (free, no key). Stooq was
-    the original primary-source plan but is currently
+    Default source is Yahoo Finance's chart API (free, no key). Tiingo
+    needs a free API key (TIINGO_API_KEY in .env) and stops pulling (not
+    erroring) once its 500-distinct-symbol/month cap is reached mid-run.
+    Stooq was the original primary-source plan but is currently
     blocked behind a JavaScript bot-check for automated clients -- a live
     finding from this build, not a hypothetical -- see data/prices.py's
     module docstring. Pass --source stooq to retry it once that changes.
@@ -157,10 +163,29 @@ def pull_prices_cmd(
         typer.secho("Universe is empty -- run `build-universe` first.", fg=typer.colors.RED)
         raise typer.Exit(1)
 
-    fetch_fn = prices.fetch_stooq_daily if source == "stooq" else prices.fetch_yahoo_chart_daily
+    budget: prices.TiingoBudget | None = None
+    if source == "tiingo":
+        try:
+            settings = load_settings(require_tiingo=True)
+        except ConfigError as exc:
+            typer.secho(str(exc), fg=typer.colors.RED)
+            raise typer.Exit(1)
+        budget = prices.TiingoBudget()
+
+        def fetch_fn(ticker: str) -> pd.DataFrame:
+            return prices.fetch_tiingo_daily(ticker, settings)
+    elif source == "stooq":
+        fetch_fn = prices.fetch_stooq_daily
+    else:
+        fetch_fn = prices.fetch_yahoo_chart_daily
+
     pulled, empty, failed, total_rows = 0, 0, 0, 0
     failures: list[str] = []
+    budget_exhausted = False
     for ticker in universe[:limit]:
+        if budget is not None and budget.remaining() <= 0:
+            budget_exhausted = True
+            break
         try:
             df = fetch_fn(ticker)
         except Exception as exc:  # noqa: BLE001 -- one bad/rate-limited ticker must not kill the whole batch
@@ -174,6 +199,8 @@ def pull_prices_cmd(
         n = pit_store.write_prices(con, df, source=source)
         total_rows += n
         pulled += 1
+        if budget is not None:
+            budget.register(ticker)
         log.info("%s: %d daily rows", ticker, n)
 
     pit_store.record_manifest(
@@ -182,6 +209,12 @@ def pull_prices_cmd(
     )
     con.close()
     typer.echo(f"Pulled {pulled} tickers ({total_rows} rows) from {source}, {empty} returned no data, {failed} failed.")
+    if budget_exhausted:
+        typer.secho(
+            "\nStopped early: Tiingo's free-tier 500-distinct-symbol/month cap is reached for this "
+            "calendar month. Wait for next month, upgrade to Tiingo's paid tier, or reduce --limit.",
+            fg=typer.colors.YELLOW,
+        )
     if failures:
         typer.secho(f"\n{len(failures)} ticker(s) failed (showing up to 5):", fg=typer.colors.YELLOW)
         for line in failures[:5]:
@@ -243,6 +276,54 @@ def compute_factors_cmd(
                f"as of {as_of_ts.date()}:\n")
     typer.echo(report.to_string(index=False))
     con.close()
+
+
+@app.command("run-backtest")
+def run_backtest_cmd(
+    start: str = typer.Option("2017-01-31", help="First monthly formation date"),
+    end: str = typer.Option(None, help="Last monthly formation date (defaults to today)"),
+    min_companies: int = typer.Option(20, help="Minimum scored companies per formation date to include it"),
+) -> None:
+    """Runs the real backtest across real point-in-time price + fundamentals
+    data: decile-sorted long-short factor returns, the FF3 replication
+    validated against Ken French, and the full taming pipeline (t-hurdles,
+    BH/BY, Deflated Sharpe Ratio, correlation clustering, LASSO spanning,
+    IPCA). Needs real price data (`pull-prices`) -- see
+    backtest/run_backtest.py's module docstring for exactly what each
+    stage computes. Writes results to the store; `make-figures` reads
+    from there for the figures that were previously skipped.
+    """
+    ensure_data_dirs()
+    from factorzoo.backtest.run_backtest import persist_backtest_result, run_full_backtest
+
+    con = pit_store.init_db()
+    if con.execute("SELECT COUNT(*) FROM prices_daily").fetchone()[0] == 0:
+        typer.secho("prices_daily is empty -- run `pull-prices` first.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    start_ts = pd.Timestamp(start)
+    end_ts = pd.Timestamp(end) if end else pd.Timestamp.today()
+    dates_df = con.execute(
+        "SELECT DISTINCT formation_date FROM universe_membership WHERE formation_date BETWEEN ? AND ? ORDER BY 1",
+        [start_ts, end_ts],
+    ).fetchdf()
+    dates = list(pd.to_datetime(dates_df["formation_date"]))
+    if not dates:
+        typer.secho(f"No formation dates between {start_ts.date()} and {end_ts.date()}.", fg=typer.colors.RED)
+        raise typer.Exit(1)
+
+    typer.echo(f"Running backtest over {len(dates)} formation dates ({dates[0].date()} to {dates[-1].date()})...")
+    result = run_full_backtest(con, dates, min_companies=min_companies)
+    persist_backtest_result(con, result)
+    con.close()
+
+    typer.echo(
+        f"Backtest complete: {len(result.dates)} dates used, "
+        f"{result.factor_vw_returns.shape[1]} factors with real return series, "
+        f"median {result.n_companies_median} companies/date."
+    )
+    if result.ipca_error:
+        typer.secho(f"IPCA fit failed: {result.ipca_error}", fg=typer.colors.YELLOW)
 
 
 @app.command("make-figures")

@@ -113,12 +113,12 @@ def _dark_layout(fig: go.Figure, title: str, subtitle: str, footer: str, height:
     return fig
 
 
-def _save_figure(fig: go.Figure, name: str) -> tuple[Path, Path]:
+def _save_figure(fig: go.Figure, name: str, scale: float = 2) -> tuple[Path, Path]:
     IMG_DIR.mkdir(parents=True, exist_ok=True)
     INTERACTIVE_DIR.mkdir(parents=True, exist_ok=True)
     png_path = IMG_DIR / f"{name}.png"
     html_path = INTERACTIVE_DIR / f"{name}.html"
-    fig.write_image(str(png_path), scale=2)
+    fig.write_image(str(png_path), scale=scale)
     # The PNG needs the fixed 1200px canvas, but the interactive page should
     # fill the browser window, so drop the fixed size for the HTML only.
     html_fig = go.Figure(fig)
@@ -151,6 +151,23 @@ def core_tables_present(con: duckdb.DuckDBPyConnection) -> tuple[bool, str]:
 
 def returns_data_present(con: duckdb.DuckDBPyConnection) -> bool:
     return con.execute("SELECT COUNT(*) FROM prices_daily").fetchone()[0] > 0
+
+
+def backtest_results_present(con: duckdb.DuckDBPyConnection) -> bool:
+    """Having price data isn't enough on its own -- `factorzoo
+    run-backtest` has to have actually been run to turn it into factor
+    return series, the FF3 replication, and the taming report these
+    figures read from."""
+    return con.execute("SELECT COUNT(*) FROM taming_report").fetchone()[0] > 0
+
+
+def _latest_backtest_manifest(con: duckdb.DuckDBPyConnection) -> dict:
+    import json
+
+    row = con.execute(
+        "SELECT detail FROM pull_manifest WHERE component = 'run-backtest' ORDER BY pulled_at DESC LIMIT 1"
+    ).fetchone()
+    return json.loads(row[0]) if row else {}
 
 
 def _real_sample_years(con: duckdb.DuckDBPyConnection) -> float:
@@ -284,13 +301,46 @@ def _dsr_fig(con: duckdb.DuckDBPyConnection) -> go.Figure:
         zaxis={"title": "Deflated Sharpe Ratio", "gridcolor": GRID, "backgroundcolor": BG, "color": TEXT, "range": [0, 1]},
         camera={"eye": {"x": 1.7, "y": -1.9, "z": 0.7}},
     )
+    overlay_note = "No real per-factor overlay yet -- needs price data (Phase 3 backtest)"
+    if backtest_results_present(con):
+        taming = con.execute("SELECT * FROM taming_report").fetchdf().dropna(subset=["annualized_sharpe", "dsr"])
+        if not taming.empty:
+            n_trials = con.execute("SELECT COUNT(*) FROM taming_report").fetchone()[0]
+            log_n_trials = np.log10(max(n_trials, 2))
+            survived = taming["bh_discovery"].astype(bool)
+            for mask, color, label in [(~survived, ACCENT_RED, "did not survive BH"), (survived, ACCENT_GREEN, "BH discovery")]:
+                sub = taming[mask]
+                if sub.empty:
+                    continue
+                fig.add_trace(
+                    go.Scatter3d(
+                        x=sub["annualized_sharpe"], y=[log_n_trials] * len(sub), z=sub["dsr"],
+                        mode="markers", name=label, marker={"size": 4, "color": color, "opacity": 0.75},
+                        hovertext=sub["factor"], hoverinfo="text",
+                    )
+                )
+            best = taming.loc[taming["dsr"].idxmax()]
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[best["annualized_sharpe"]], y=[log_n_trials], z=[best["dsr"] + 0.03],
+                    mode="markers+text", marker={"size": 7, "color": ACCENT_YELLOW, "symbol": "diamond"},
+                    text=[f"{best['factor']}<br>Sharpe={best['annualized_sharpe']:.2f}, DSR={best['dsr']:.2f}"],
+                    textposition="top center", textfont={"color": ACCENT_YELLOW, "size": 11}, showlegend=False,
+                )
+            )
+            fig.update_layout(legend={"bgcolor": "rgba(0,0,0,0)", "font": {"color": TEXT}, "x": 0.02, "y": 0.9})
+            overlay_note = (
+                f"Overlay: {len(taming)} real factors from the actual backtest (VW long-short annualized Sharpe, "
+                f"log10({n_trials}) trials tested, real DSR), green = survives BH at q=10%. Best by DSR: "
+                f"{best['factor']}."
+            )
+
     _dark_layout(
         fig,
         "ILLUSTRATION: how many strategies you tried deflates an impressive Sharpe ratio",
         f"Parametric surface (Bailey & Lopez de Prado 2014 closed form); assumed trial-Sharpe std=0.35, "
         f"n_obs={n_obs:.0f} months (illustrative -- this replica's real EDGAR span is {years_real:.0f}y, but that "
-        "makes the surface a near-vertical cliff, not a legible one). No real per-factor overlay yet -- needs "
-        "price-derived long-short Sharpe ratios (Phase 3 backtest, blocked on price data)",
+        f"makes the surface a near-vertical cliff, not a legible one). {overlay_note}",
         snapshot_footer_text(con),
     )
     return fig
@@ -298,11 +348,13 @@ def _dsr_fig(con: duckdb.DuckDBPyConnection) -> go.Figure:
 
 def dsr_surface(con: duckdb.DuckDBPyConnection) -> FigureResult:
     fig = _dsr_fig(con)
-    png, html = _save_figure(fig, "dsr_surface")
-    return FigureResult(
-        name="dsr_surface", status="generated", output_png=png, output_html=html,
-        note="illustration only -- real per-factor Sharpe overlay needs price data (Phase 3 backtest)",
+    png, html = _save_figure(fig, "dsr_surface", scale=1.6)
+    note = (
+        "surface is illustration (parametric); per-factor markers are real backtest results"
+        if backtest_results_present(con)
+        else "illustration only -- real per-factor Sharpe overlay needs `factorzoo run-backtest`"
     )
+    return FigureResult(name="dsr_surface", status="generated", output_png=png, output_html=html, note=note)
 
 
 def dsr_surface_rotating_gif(con: duckdb.DuckDBPyConnection) -> FigureResult:
@@ -485,54 +537,253 @@ def universe_by_year(con: duckdb.DuckDBPyConnection) -> FigureResult:
     return FigureResult(name=name, status="generated", output_png=png, output_html=html)
 
 
-# --- (d)/(e)/(f)/(h): blocked on real price data -- honest skips -----------
+# --- (d)/(e)/(f)/(h): real once `factorzoo run-backtest` has been run ------
+
+_BACKTEST_MISSING_INPUT = (
+    "taming_report is empty -- prices_daily may have data, but the backtest that turns it into real "
+    "factor returns hasn't been run yet"
+)
+_BACKTEST_PRODUCED_BY = "`factorzoo run-backtest`, after `factorzoo pull-prices` has real price data"
 
 
 def ff_validation(con: duckdb.DuckDBPyConnection) -> FigureResult:
-    if not returns_data_present(con):
+    from plotly.subplots import make_subplots
+
+    name = "ff_validation"
+    if not backtest_results_present(con):
+        return FigureResult(name=name, status="skipped", missing_input=_BACKTEST_MISSING_INPUT, produced_by=_BACKTEST_PRODUCED_BY)
+
+    replica = con.execute("SELECT * FROM ff3_replica ORDER BY formation_date").fetchdf()
+    validation = con.execute("SELECT * FROM french_validation").fetchdf()
+    if replica.empty or validation.empty:
         return FigureResult(
-            name="ff_validation", status="skipped",
-            missing_input="prices_daily is empty -- no price data to build replica SMB/HML/MKT from",
-            produced_by="eval/benchmarks.py::ff3_series, once `factorzoo pull-prices` has real price data "
-            "and Phase 3's portfolio sorts can form the replica's own factor returns to compare against "
-            "Ken French's published series",
+            name=name, status="skipped",
+            missing_input="ff3_replica/french_validation are empty -- the backtest ran but produced no FF3 series "
+            "(too few formation dates, or ff5_daily wasn't pulled)",
+            produced_by=_BACKTEST_PRODUCED_BY,
         )
-    raise NotImplementedError("returns_data_present() is true but ff_validation was never wired up to it")
+
+    ff5 = con.execute("SELECT * FROM ff5_daily").fetchdf()
+    ff5["date"] = pd.to_datetime(ff5["date"])
+    ff5_monthly = ff5.set_index("date")[["mkt_rf", "smb", "hml"]].resample("ME").apply(lambda s: (1 + s).prod() - 1)
+    ff5_monthly.index = ff5_monthly.index.to_period("M").to_timestamp()
+    ff5_monthly = ff5_monthly.rename(columns={"mkt_rf": "mkt"})
+
+    # ff3_replica's formation_date is month-END (e.g. 2017-01-31, the
+    # universe's own convention); ff5_monthly's index above is
+    # month-START (Period.to_timestamp()'s default). Joining the two
+    # as-is compares disjoint calendar days and silently drops every row
+    # -- confirmed live: both sides individually had zero NaNs, but the
+    # join produced zero overlapping rows. Normalize both to the same
+    # month-start representation (run_full_backtest's own French
+    # validation already does this; this figure function had not).
+    replica = replica.set_index("formation_date")
+    replica.index = pd.to_datetime(replica.index).to_period("M").to_timestamp()
+    pairs = [("mkt", "market"), ("smb", "SMB"), ("hml", "HML")]
+    fig = make_subplots(
+        rows=3, cols=2, column_widths=[0.62, 0.38], horizontal_spacing=0.09, vertical_spacing=0.08,
+        subplot_titles=[t for p in pairs for t in (f"{p[1]}: replica vs. Ken French", f"{p[1]} scatter")],
+    )
+    corr_by_factor = validation.set_index("factor")["correlation"].to_dict()
+    for i, (col, label) in enumerate(pairs):
+        row = i + 1
+        joined = pd.DataFrame({"replica": replica[col], "french": ff5_monthly[col]}).dropna()
+        fig.add_trace(
+            go.Scatter(x=joined.index, y=joined["replica"], mode="lines", name=f"replica {label}",
+                       line={"color": ACCENT_BLUE, "width": 1.5}, showlegend=(i == 0)),
+            row=row, col=1,
+        )
+        fig.add_trace(
+            go.Scatter(x=joined.index, y=joined["french"], mode="lines", name=f"Ken French {label}",
+                       line={"color": ACCENT_YELLOW, "width": 1.5}, showlegend=(i == 0)),
+            row=row, col=1,
+        )
+        fig.add_trace(
+            go.Scatter(x=joined["french"], y=joined["replica"], mode="markers", showlegend=False,
+                       marker={"color": ACCENT_BLUE, "size": 5, "opacity": 0.6}),
+            row=row, col=2,
+        )
+        lims = [joined.to_numpy().min(), joined.to_numpy().max()]
+        fig.add_trace(
+            go.Scatter(x=lims, y=lims, mode="lines", line={"color": MUTED, "width": 1, "dash": "dot"}, showlegend=False),
+            row=row, col=2,
+        )
+
+    fig.update_xaxes(gridcolor=GRID, color=TEXT)
+    fig.update_yaxes(gridcolor=GRID, color=TEXT)
+    for ann in fig.layout.annotations:
+        ann.font = {"color": TEXT, "size": 12}
+
+    corr_bits = ", ".join(f"{lab} r={corr_by_factor.get(lab2, float('nan')):.2f}" for (col, lab), lab2 in zip(pairs, ["market", "SMB", "HML"]))
+    all_pass = all(validation["clears_0_9_gate"])
+    headline_color = ACCENT_GREEN if all_pass else ACCENT_RED
+    fig.update_layout(
+        template="plotly_dark", paper_bgcolor=BG, plot_bgcolor=BG, font={"family": FONT_FAMILY, "color": TEXT, "size": 13},
+        width=1200, height=1000,
+        title={
+            "text": f"<span style='color:{headline_color}'>Replica vs. Ken French: {corr_bits}</span>"
+            f"<br><span style='font-size:13px;color={MUTED}'>Real monthly series, "
+            f"{int(validation['n_months'].max())} months overlap. Green if the 0.9 correlation gate is cleared "
+            "on every factor, red otherwise.</span>",
+            "x": 0.5, "xanchor": "center",
+        },
+        margin={"l": 70, "r": 40, "t": 120, "b": 90},
+        annotations=list(fig.layout.annotations) + [
+            {"text": snapshot_footer_text(con), "showarrow": False, "x": 0.5, "y": -0.045, "xref": "paper", "yref": "paper",
+                 "font": {"size": 10.5, "color": MUTED}},
+        ],
+    )
+    png, html = _save_figure(fig, name, scale=1.5)
+    return FigureResult(name=name, status="generated", output_png=png, output_html=html)
 
 
 def cumulative_ls_returns(con: duckdb.DuckDBPyConnection) -> FigureResult:
-    if not returns_data_present(con):
-        return FigureResult(
-            name="cumulative_ls_returns", status="skipped",
-            missing_input="prices_daily is empty -- no price data to form long-short portfolio returns from",
-            produced_by="portfolios/returns.py, once `factorzoo pull-prices` has real price data and "
-            "Phase 3's decile sorts can produce real top-minus-bottom VW return series per factor",
-        )
-    raise NotImplementedError("returns_data_present() is true but cumulative_ls_returns was never wired up to it")
+    name = "cumulative_ls_returns"
+    if not backtest_results_present(con):
+        return FigureResult(name=name, status="skipped", missing_input=_BACKTEST_MISSING_INPUT, produced_by=_BACKTEST_PRODUCED_BY)
+
+    taming = con.execute("SELECT * FROM taming_report").fetchdf()
+    returns = con.execute("SELECT * FROM factor_returns_monthly ORDER BY formation_date").fetchdf()
+    ff3 = con.execute("SELECT * FROM ff3_replica ORDER BY formation_date").fetchdf()
+    if returns.empty:
+        return FigureResult(name=name, status="skipped", missing_input="factor_returns_monthly is empty", produced_by=_BACKTEST_PRODUCED_BY)
+
+    survivors = taming[taming["bh_discovery"] & taming["one_per_cluster"]].sort_values("dsr", ascending=False)
+    top = survivors.head(5)["factor"].tolist()
+    if not top:
+        top = taming.reindex(taming["tstat"].abs().sort_values(ascending=False).index).head(5)["factor"].tolist()
+
+    wide = returns.pivot(index="formation_date", columns="factor", values="vw_return")
+    fig = go.Figure()
+    colors = [ACCENT_BLUE, ACCENT_YELLOW, ACCENT_GREEN, ACCENT_RED, "#b36ae2"]
+    for i, factor in enumerate(top):
+        cum = (1 + wide[factor].fillna(0)).cumprod()
+        fig.add_trace(go.Scatter(x=cum.index, y=cum, mode="lines", name=factor, line={"color": colors[i % len(colors)], "width": 2}))
+
+    if not ff3.empty:
+        mkt_cum = (1 + ff3.set_index("formation_date")["mkt"].fillna(0)).cumprod()
+        fig.add_trace(go.Scatter(x=mkt_cum.index, y=mkt_cum, mode="lines", name="market (VW, for reference)",
+                                  line={"color": MUTED, "width": 2, "dash": "dot"}))
+
+    fig.update_layout(
+        xaxis={"title": "formation date", "gridcolor": GRID, "color": TEXT},
+        yaxis={"title": "cumulative growth of $1 (log scale)", "type": "log", "gridcolor": GRID, "color": TEXT},
+        legend={"bgcolor": "rgba(0,0,0,0)", "font": {"color": TEXT}},
+    )
+    _dark_layout(
+        fig,
+        f"Cumulative value-weighted long-short returns: the {len(top)} top surviving factors",
+        "Real monthly VW long-short returns, compounded. 'Surviving' = BH-discovery AND one-per-correlation-"
+        "cluster, ranked by Deflated Sharpe Ratio; falls back to |t|-ranked if nothing clears BH. Market line is "
+        "the replica's own real value-weighted return, for reference.",
+        snapshot_footer_text(con),
+        height=700,
+    )
+    png, html = _save_figure(fig, name)
+    return FigureResult(name=name, status="generated", output_png=png, output_html=html)
 
 
 def taming_funnel(con: duckdb.DuckDBPyConnection) -> FigureResult:
-    if not returns_data_present(con):
-        return FigureResult(
-            name="taming_funnel", status="skipped",
-            missing_input="prices_daily is empty -- the funnel's t>2/t>3/BH/BY stages all need real per-factor "
-            "return t-statistics, not fundamentals-only cross-sectional values",
-            produced_by="taming/multiple_testing.py (t-hurdles, BH/BY) + taming/dimension_reduction.py "
-            "(one-per-cluster, LASSO), once Phase 3 produces real long-short factor return series to test",
+    name = "taming_funnel"
+    if not backtest_results_present(con):
+        return FigureResult(name=name, status="skipped", missing_input=_BACKTEST_MISSING_INPUT, produced_by=_BACKTEST_PRODUCED_BY)
+
+    taming = con.execute("SELECT * FROM taming_report").fetchdf()
+    # A funnel is strictly cumulative -- each stage must be a SUBSET of
+    # the one before it, never computed independently. taming_report's
+    # own one_per_cluster/lasso_survives columns are computed over the
+    # FULL factor set (useful for the DSR-surface overlay and other
+    # figures, which want "is this factor redundant" independent of
+    # whether it individually cleared a t-hurdle), so this function
+    # re-intersects them stage-by-stage rather than reading the column
+    # sums directly -- confirmed live: real data clears BH/BY discovery
+    # for ZERO factors, and reading one_per_cluster's raw sum (30) would
+    # have shown the bar going back UP after BH's bar hit zero, which
+    # looks like a funnel chart bug rather than the real (and honestly
+    # the whole point of this project) finding that almost nothing
+    # survives honest multiple-testing correction.
+    survivors = set(taming["factor"])
+    stages = [("all factors tested", len(survivors))]
+    for label, col in [
+        ("|t| > 2", "passes_t2"), ("|t| > 3 (HLZ)", "passes_t3_hlz"),
+        ("BH discovery", "bh_discovery"), ("BY discovery", "by_discovery"),
+        ("one per cluster", "one_per_cluster"), ("LASSO-survives spanning test", "lasso_survives"),
+    ]:
+        survivors &= set(taming.loc[taming[col].astype(bool), "factor"])
+        stages.append((label, len(survivors)))
+    fig = go.Figure(
+        go.Funnel(
+            y=[s for s, _ in stages], x=[n for _, n in stages],
+            textposition="inside", textinfo="value+percent initial",
+            marker={"color": [BLUE_YELLOW[0][1], "#1d3a63", "#2a5590", ACCENT_BLUE, "#5aa0eb", ACCENT_YELLOW, ACCENT_GREEN]},
+            connector={"line": {"color": GRID, "width": 1}},
         )
-    raise NotImplementedError("returns_data_present() is true but taming_funnel was never wired up to it")
+    )
+    fig.update_layout(yaxis={"color": TEXT}, xaxis={"color": TEXT})
+    final_n = stages[-1][1]
+    _dark_layout(
+        fig,
+        "How many of the 48 factors survive each stage of statistical taming",
+        f"Real t-statistics and Deflated Sharpe Ratios from {len(taming)} factors with computed return series "
+        f"(alpha=5% for t-hurdles; q=10% for BH/BY); each stage is a strict subset of the one before it. "
+        f"{final_n} of {len(taming)} survive every stage -- real multiple-testing correction is exactly this "
+        "harsh on a real cross-section.",
+        snapshot_footer_text(con),
+        height=620,
+    )
+    png, html = _save_figure(fig, name)
+    return FigureResult(name=name, status="generated", output_png=png, output_html=html)
 
 
 def ipca_r2(con: duckdb.DuckDBPyConnection) -> FigureResult:
-    if not returns_data_present(con):
+    name = "ipca_r2"
+    if not backtest_results_present(con):
+        return FigureResult(name=name, status="skipped", missing_input=_BACKTEST_MISSING_INPUT, produced_by=_BACKTEST_PRODUCED_BY)
+
+    r2 = con.execute("SELECT * FROM ipca_r2 ORDER BY n_factors").fetchdf()
+    if r2.empty:
+        manifest = _latest_backtest_manifest(con)
         return FigureResult(
-            name="ipca_r2", status="skipped",
-            missing_input="prices_daily is empty -- IPCA needs both characteristics (have) and a real panel "
-            "of asset returns (don't have) to fit against",
-            produced_by="taming/ipca_model.py, once `factorzoo pull-prices` has real price data to build the "
-            "return panel IPCA regresses characteristics against",
+            name=name, status="skipped",
+            missing_input=f"ipca_r2 table is empty -- the IPCA fit itself failed: {manifest.get('ipca_error', 'unknown reason')}",
+            produced_by=_BACKTEST_PRODUCED_BY,
         )
-    raise NotImplementedError("returns_data_present() is true but ipca_r2 was never wired up to it")
+
+    manifest = _latest_backtest_manifest(con)
+    pca_r2 = manifest.get("pca_r2") or {}
+    ff5_r2 = manifest.get("ff5_r2")
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=r2["n_factors"], y=r2["total_r2"], mode="lines+markers", name="IPCA total R²",
+                              line={"color": ACCENT_BLUE, "width": 2}, marker={"size": 8}))
+    fig.add_trace(go.Scatter(x=r2["n_factors"], y=r2["predictive_r2"], mode="lines+markers", name="IPCA predictive R²",
+                              line={"color": ACCENT_YELLOW, "width": 2}, marker={"size": 8}))
+    if pca_r2:
+        pca_x = sorted(int(k) for k in pca_r2)
+        pca_y = [pca_r2[str(k)] if str(k) in pca_r2 else pca_r2.get(k) for k in pca_x]
+        fig.add_trace(go.Scatter(x=pca_x, y=pca_y, mode="lines+markers", name="naive PCA-on-returns",
+                                  line={"color": MUTED, "width": 2, "dash": "dash"}, marker={"size": 7}))
+    if ff5_r2 is not None:
+        fig.add_hline(y=ff5_r2, line={"color": ACCENT_GREEN, "width": 1.5, "dash": "dot"},
+                       annotation_text=f"FF5 regression R²={ff5_r2:.2f}", annotation_font={"color": ACCENT_GREEN})
+
+    fig.update_layout(
+        xaxis={"title": "K (number of latent factors)", "gridcolor": GRID, "color": TEXT, "dtick": 1},
+        yaxis={"title": "R²", "gridcolor": GRID, "color": TEXT},
+        legend={"bgcolor": "rgba(0,0,0,0)", "font": {"color": TEXT}},
+    )
+    _dark_layout(
+        fig,
+        "IPCA: total vs. predictive R² by number of latent factors",
+        "Real fit on one-per-correlation-cluster characteristics (not the full 35-factor registry -- "
+        "confirmed live that feeding IPCA every near-duplicate characteristic makes its ALS estimator hit a "
+        "singular matrix). No real q-factor benchmark is wired into this project, so that reference line is "
+        "omitted rather than estimated.",
+        snapshot_footer_text(con),
+        height=650,
+    )
+    png, html = _save_figure(fig, name)
+    return FigureResult(name=name, status="generated", output_png=png, output_html=html)
 
 
 # --- orchestrator ------------------------------------------------------

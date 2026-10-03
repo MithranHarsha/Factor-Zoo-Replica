@@ -93,6 +93,60 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
         git_commit VARCHAR
     )
     """,
+    # The tables below hold DERIVED backtest output, not raw pulled data --
+    # unlike xbrl_facts/prices_daily (append-only, vintage-preserving),
+    # these are fully REPLACED on every `run-backtest` (see
+    # backtest/run_backtest.py::persist_backtest_result), since they
+    # represent "the current run's result for this date range/universe",
+    # not an immutable historical record.
+    """
+    CREATE TABLE IF NOT EXISTS factor_returns_monthly (
+        formation_date TIMESTAMP,
+        factor VARCHAR,
+        vw_return DOUBLE,
+        ew_return DOUBLE,
+        PRIMARY KEY (formation_date, factor)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS taming_report (
+        factor VARCHAR PRIMARY KEY,
+        tstat DOUBLE,
+        pvalue DOUBLE,
+        passes_t2 BOOLEAN,
+        passes_t3_hlz BOOLEAN,
+        bh_discovery BOOLEAN,
+        by_discovery BOOLEAN,
+        one_per_cluster BOOLEAN,
+        lasso_survives BOOLEAN,
+        annualized_sharpe DOUBLE,
+        dsr DOUBLE,
+        cluster_label BIGINT
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS ff3_replica (
+        formation_date TIMESTAMP PRIMARY KEY,
+        mkt DOUBLE,
+        smb DOUBLE,
+        hml DOUBLE
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS french_validation (
+        factor VARCHAR PRIMARY KEY,
+        n_months INTEGER,
+        correlation DOUBLE,
+        clears_0_9_gate BOOLEAN
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS ipca_r2 (
+        n_factors INTEGER PRIMARY KEY,
+        total_r2 DOUBLE,
+        predictive_r2 DOUBLE
+    )
+    """,
 )
 
 
@@ -211,6 +265,60 @@ def write_ff5(con: duckdb.DuckDBPyConnection, df: pd.DataFrame) -> int:
     con.execute("INSERT INTO ff5_daily SELECT * FROM _stage ON CONFLICT (date) DO NOTHING")
     con.unregister("_stage")
     return len(df)
+
+
+def _replace_table(con: duckdb.DuckDBPyConnection, table: str, df: pd.DataFrame, columns: list[str]) -> int:
+    """Full replace, not upsert -- these tables hold one backtest run's
+    derived output, not accumulated history (see the schema comment
+    above factor_returns_monthly)."""
+    con.execute(f"DELETE FROM {table}")
+    if df.empty:
+        return 0
+    con.register("_stage", df[columns])
+    con.execute(f"INSERT INTO {table} SELECT * FROM _stage")
+    con.unregister("_stage")
+    return len(df)
+
+
+def write_factor_returns(con: duckdb.DuckDBPyConnection, vw: pd.DataFrame, ew: pd.DataFrame) -> int:
+    vw_long = vw.reset_index(names="formation_date").melt(id_vars="formation_date", var_name="factor", value_name="vw_return")
+    ew_long = ew.reset_index(names="formation_date").melt(id_vars="formation_date", var_name="factor", value_name="ew_return")
+    merged = vw_long.merge(ew_long, on=["formation_date", "factor"], how="outer").dropna(subset=["vw_return", "ew_return"], how="all")
+    return _replace_table(con, "factor_returns_monthly", merged, ["formation_date", "factor", "vw_return", "ew_return"])
+
+
+def write_taming_report(con: duckdb.DuckDBPyConnection, taming: pd.DataFrame) -> int:
+    df = taming.reset_index(names="factor")
+    cols = [
+        "factor", "tstat", "pvalue", "passes_t2", "passes_t3_hlz", "bh_discovery", "by_discovery",
+        "one_per_cluster", "lasso_survives", "annualized_sharpe", "dsr", "cluster_label",
+    ]
+    for c in cols:
+        if c not in df.columns:
+            df[c] = pd.NA
+    return _replace_table(con, "taming_report", df, cols)
+
+
+def write_ff3_replica(con: duckdb.DuckDBPyConnection, df: pd.DataFrame) -> int:
+    """Expects a flat frame (not date-indexed) with a 'date' column --
+    i.e. ff3_series' own output column name, or BacktestResult.ff3_replica
+    .reset_index() -- confirmed live: an earlier version of this function
+    tried to handle an already-reset-index frame as if it might still
+    need resetting, which re-ran reset_index on a plain RangeIndex and
+    wrote row numbers (0, 1, 2, ...) into formation_date instead of the
+    real dates.
+    """
+    data = df.rename(columns={"date": "formation_date"}) if "date" in df.columns else df
+    return _replace_table(con, "ff3_replica", data, ["formation_date", "mkt", "smb", "hml"])
+
+
+def write_french_validation(con: duckdb.DuckDBPyConnection, df: pd.DataFrame) -> int:
+    data = df.rename(columns={"clears_0.9_gate": "clears_0_9_gate"})
+    return _replace_table(con, "french_validation", data, ["factor", "n_months", "correlation", "clears_0_9_gate"])
+
+
+def write_ipca_r2(con: duckdb.DuckDBPyConnection, df: pd.DataFrame) -> int:
+    return _replace_table(con, "ipca_r2", df, ["n_factors", "total_r2", "predictive_r2"])
 
 
 # --- point-in-time queries ---------------------------------------------------

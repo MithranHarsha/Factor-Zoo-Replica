@@ -23,7 +23,18 @@ def correlation_clusters(factor_returns: pd.DataFrame, distance_threshold: float
     sign convention) cluster together too, not just positively-correlated
     near-duplicates.
     """
-    corr = factor_returns.corr()
+    # Confirmed live on a real cross-section (35 fundamentals-based
+    # factors over 296 companies): two sparsely-populated factors (each
+    # individually has plenty of non-null values, but little pairwise
+    # OVERLAP with each other) can produce a NaN pairwise correlation
+    # even though neither column is degenerate on its own. squareform
+    # requires every distance to be finite, so an unfilled NaN here
+    # crashes linkage with an opaque "condensed distance matrix must
+    # contain only finite values" rather than surfacing the real cause.
+    # Treating "can't tell if these move together" as "uncorrelated" (0)
+    # is the same convention cluster_heatmap already applies to its own
+    # correlation matrix.
+    corr = factor_returns.corr().fillna(0.0)
     distance = 1 - corr.abs()
     # .to_numpy(copy=True), not .values: pandas' copy-on-write can hand
     # back a read-only view, and np.fill_diagonal mutates in place --

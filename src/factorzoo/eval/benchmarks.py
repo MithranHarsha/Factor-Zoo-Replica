@@ -81,13 +81,23 @@ def compute_smb_hml(
     sub["_contrib"] = sub["_w_renorm"] * sub[return_col]
     port_ret = sub.groupby("_label")["_contrib"].sum().to_dict()
 
-    small = [port_ret.get(f"S/{g}") for g in "LMH"]
-    big = [port_ret.get(f"B/{g}") for g in "LMH"]
-    smb = np.nanmean(small) - np.nanmean(big) if any(v is not None for v in small + big) else np.nan
+    # port_ret.get(...) is a plain dict.get -- a bucket with NO companies
+    # in it (genuinely possible with a small or lopsided cross-section,
+    # confirmed live on real data: one of the six S/L..B/H cells came up
+    # empty) returns None, not NaN. A list mixing None with real floats
+    # makes numpy infer an object-dtype array, and np.nanmean on an
+    # object array doesn't know None means "missing" the way it knows NaN
+    # does -- it tries to sum None + float and raises TypeError instead
+    # of skipping it. np.nan as the dict.get default keeps the array
+    # numeric so nanmean's actual job (skip missing, average the rest)
+    # works as intended.
+    small = [port_ret.get(f"S/{g}", np.nan) for g in "LMH"]
+    big = [port_ret.get(f"B/{g}", np.nan) for g in "LMH"]
+    smb = np.nanmean(small) - np.nanmean(big) if any(not np.isnan(v) for v in small + big) else np.nan
 
-    high = [port_ret.get("S/H"), port_ret.get("B/H")]
-    low = [port_ret.get("S/L"), port_ret.get("B/L")]
-    hml = np.nanmean(high) - np.nanmean(low) if any(v is not None for v in high + low) else np.nan
+    high = [port_ret.get("S/H", np.nan), port_ret.get("B/H", np.nan)]
+    low = [port_ret.get("S/L", np.nan), port_ret.get("B/L", np.nan)]
+    hml = np.nanmean(high) - np.nanmean(low) if any(not np.isnan(v) for v in high + low) else np.nan
 
     return {"smb": smb, "hml": hml, "portfolio_returns": port_ret}
 

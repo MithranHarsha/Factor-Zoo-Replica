@@ -303,7 +303,14 @@ def parse_tiingo_json(payload: list[dict], ticker: str) -> pd.DataFrame:
         return pd.DataFrame(columns=["entity_id_hint", "date", "open", "high", "low", "close", "volume"])
     df = pd.DataFrame(payload)
     df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None)
-    df = df.rename(
+    # Tiingo returns BOTH raw and split/dividend-adjusted OHLCV in the same
+    # row (confirmed live: a real response also carries divCash and
+    # splitFactor). Select the adjusted columns by their own names first,
+    # THEN rename -- renaming in place while the raw open/high/low/close/
+    # volume columns are still present creates duplicate column labels
+    # (two columns both named "open", etc.), which silently blows up the
+    # downstream DuckDB insert instead of failing in pandas.
+    adjusted = df[["adjOpen", "adjHigh", "adjLow", "adjClose", "adjVolume"]].rename(
         columns={
             "adjOpen": "open",
             "adjHigh": "high",
@@ -312,8 +319,9 @@ def parse_tiingo_json(payload: list[dict], ticker: str) -> pd.DataFrame:
             "adjVolume": "volume",
         }
     )
-    df.insert(0, "entity_id_hint", ticker.upper())
-    return df[["entity_id_hint", "date", "open", "high", "low", "close", "volume"]]
+    adjusted.insert(0, "date", df["date"])
+    adjusted.insert(0, "entity_id_hint", ticker.upper())
+    return adjusted[["entity_id_hint", "date", "open", "high", "low", "close", "volume"]]
 
 
 class TiingoBudget:

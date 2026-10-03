@@ -56,6 +56,26 @@ class TestCorrelationClusters:
         clusters = correlation_clusters(df, distance_threshold=0.3)
         assert clusters["momentum_12_1"] != clusters["book_to_market"]
 
+    def test_sparse_columns_with_no_pairwise_overlap_do_not_raise(self):
+        # Confirmed live on a real cross-section: two factors can each
+        # individually have plenty of non-null values but almost no
+        # overlap with EACH OTHER, giving a NaN pairwise correlation even
+        # though neither column is degenerate alone. squareform/linkage
+        # require every distance to be finite, so an unfilled NaN used to
+        # crash with an opaque scipy error instead of just treating
+        # "can't tell" as "uncorrelated."
+        n = 40
+        df = pd.DataFrame(
+            {
+                "dense_a": np.linspace(0, 1, n),
+                "dense_b": np.linspace(1, 0, n),
+                "sparse_early": [float(i) if i < 15 else np.nan for i in range(n)],
+                "sparse_late": [float(i) if i >= 25 else np.nan for i in range(n)],
+            }
+        )
+        clusters = correlation_clusters(df, distance_threshold=0.3)  # must not raise
+        assert set(clusters.index) == set(df.columns)
+
 
 class TestSelectClusterRepresentatives:
     def test_picks_the_highest_tstat_factor_per_cluster(self):

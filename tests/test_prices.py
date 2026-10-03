@@ -42,12 +42,25 @@ class TestParseStooqCsv:
 
 TIINGO_SAMPLE = [
     {
+        # Real Tiingo responses carry BOTH raw and adjusted OHLCV in the
+        # same row (confirmed live against a real pull), plus divCash/
+        # splitFactor -- the raw fields are included here deliberately,
+        # since a fixture with only the adj* fields let a column-collision
+        # bug (two columns both named "open" after renaming) through
+        # undetected until a real pull hit it.
         "date": "2024-01-02T00:00:00.000Z",
+        "close": 184.0,
+        "high": 185.0,
+        "low": 183.0,
+        "open": 184.5,
+        "volume": 990000,
         "adjOpen": 185.0,
         "adjHigh": 186.0,
         "adjLow": 184.5,
         "adjClose": 185.5,
         "adjVolume": 1000000,
+        "divCash": 0.0,
+        "splitFactor": 1.0,
     }
 ]
 
@@ -57,6 +70,21 @@ class TestParseTiingoJson:
         df = parse_tiingo_json(TIINGO_SAMPLE, "aapl")
         assert len(df) == 1
         assert df.iloc[0]["close"] == 185.5
+
+    def test_uses_adjusted_prices_not_raw(self):
+        # The raw (non-split/dividend-adjusted) OHLCV in the same payload
+        # must never leak through under the "open"/"high"/etc. names.
+        df = parse_tiingo_json(TIINGO_SAMPLE, "aapl")
+        row = df.iloc[0]
+        assert row["open"] == 185.0
+        assert row["high"] == 186.0
+        assert row["low"] == 184.5
+        assert row["volume"] == 1000000
+
+    def test_no_duplicate_columns(self):
+        df = parse_tiingo_json(TIINGO_SAMPLE, "aapl")
+        assert list(df.columns) == ["entity_id_hint", "date", "open", "high", "low", "close", "volume"]
+        assert not df.columns.duplicated().any()
 
     def test_empty_payload_returns_empty_frame(self):
         df = parse_tiingo_json([], "ZZZZNOTREAL")

@@ -202,6 +202,44 @@ class TestAttachMarketCap:
         result = attach_market_cap(con, empty, as_of="2024-01-01")
         assert "market_cap" in result.columns
 
+    def test_multi_class_share_company_does_not_fan_out_rows(self, con):
+        # Confirmed live on real data: Alphabet (GOOG/GOOGL) and Fox
+        # (FOX/FOXA) each file as ONE CIK under two tickers. A plain join
+        # against entity_crosswalk fanned that one company's single
+        # snapshot row out into two price-joined rows (one per ticker's
+        # own price series) -- this regression test is a minimal repro
+        # of that: one entity_id, two crosswalk tickers, both with real
+        # (different) prices on the as-of date.
+        entity_id = "CIK0000000099"
+        pit_store.write_crosswalk(
+            con,
+            pd.DataFrame(
+                [
+                    {"ticker": "DUO", "cik": 99, "entity_id": entity_id, "title": "Duo Class Co", "sic": "7372", "sic_description": "Software"},
+                    {"ticker": "DUOB", "cik": 99, "entity_id": entity_id, "title": "Duo Class Co", "sic": "7372", "sic_description": "Software"},
+                ]
+            ),
+        )
+        pit_store.write_xbrl_facts(
+            con,
+            pd.DataFrame([_fact(entity_id, "CommonStockSharesOutstanding", 100.0, None, "2023-12-31", "2024-02-15", "A1")]),
+        )
+        pit_store.write_prices(
+            con,
+            pd.DataFrame(
+                [
+                    {"entity_id_hint": "DUO", "date": pd.Timestamp("2024-03-01"), "open": 9, "high": 11, "low": 9, "close": 10.0, "volume": 100},
+                    {"entity_id_hint": "DUOB", "date": pd.Timestamp("2024-03-01"), "open": 19, "high": 21, "low": 19, "close": 20.0, "volume": 100},
+                ]
+            ),
+            source="test",
+        )
+        snapshot = build_point_in_time_snapshot(con, "2025-01-01")
+        result = attach_market_cap(con, snapshot, as_of="2024-04-15")
+        rows = result[result["entity_id"] == entity_id]
+        assert len(rows) == 1  # not 2 -- the company is represented once, not once per share class
+        assert rows.iloc[0]["price_at_formation"] == 10.0  # deterministic tie-break: "DUO" before "DUOB"
+
 
 class TestBuildMonthlyPricePanel:
     def _write_prices(self, con, rows):

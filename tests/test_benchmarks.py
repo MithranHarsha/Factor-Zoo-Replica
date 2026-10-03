@@ -123,6 +123,36 @@ class TestComputeSmbHml:
         assert np.isnan(result["smb"])
         assert np.isnan(result["hml"])
 
+    def test_empty_buckets_do_not_raise(self):
+        # Confirmed live on a real (small) cross-section: one or more of
+        # the six S/L..B/H cells can end up with zero companies in it.
+        # port_ret.get(...) then returns None for that cell, and a list
+        # mixing None with real floats made np.nanmean raise a TypeError
+        # instead of just skipping the missing cell (None isn't NaN as
+        # far as numpy's "nan-aware" functions are concerned) -- this is
+        # a regression test for that fix.
+        #
+        # This fixture happens to be an extreme case of it: the size
+        # breakpoint is computed from the large-cap SUBSET (the top 25%
+        # by count -- fama_french_2x3_breakpoints), which with only 6
+        # names is just the three market_cap=100 rows, giving
+        # size_median=100. Every row (cap 10 or 100) is <= 100, so every
+        # single name lands in "S" -- the entire "B" side, and (since
+        # book_to_market is tied too) every bucket but S/L, end up empty.
+        # The real bug this guards is the same either way: a dict.get
+        # miss must not reach np.nanmean as a bare None.
+        df = pd.DataFrame(
+            {
+                "market_cap": [10.0, 10.0, 10.0, 100.0, 100.0, 100.0],
+                "book_to_market": [1.0] * 6,
+                "fwd_return": [0.01, 0.02, 0.03, 0.04, 0.05, 0.06],
+            }
+        )
+        result = compute_smb_hml(df, "market_cap", "book_to_market", "fwd_return")  # must not raise
+        assert np.isnan(result["smb"])  # the whole "B" side is empty -- no small-vs-big comparison possible
+        assert np.isnan(result["hml"])  # S/H and B/H are both empty -- genuinely no HML signal
+        assert result["portfolio_returns"] == {"S/L": pytest.approx(0.04727272727272727)}
+
 
 class TestComputeMarketReturn:
     def test_value_weighted_average(self):
