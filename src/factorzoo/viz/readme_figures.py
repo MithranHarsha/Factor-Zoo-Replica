@@ -119,7 +119,17 @@ def _save_figure(fig: go.Figure, name: str) -> tuple[Path, Path]:
     png_path = IMG_DIR / f"{name}.png"
     html_path = INTERACTIVE_DIR / f"{name}.html"
     fig.write_image(str(png_path), scale=2)
-    fig.write_html(str(html_path), include_plotlyjs="cdn", full_html=True)
+    # The PNG needs the fixed 1200px canvas, but the interactive page should
+    # fill the browser window, so drop the fixed size for the HTML only.
+    html_fig = go.Figure(fig)
+    html_fig.update_layout(width=None, height=None, autosize=True)
+    html_fig.write_html(
+        str(html_path), include_plotlyjs="cdn", full_html=True,
+        default_width="100vw", default_height="100vh", config={"responsive": True},
+    )
+    html_path.write_text(
+        html_path.read_text().replace("<head>", f"<head><style>html,body{{margin:0;overflow:hidden;background:{BG}}}</style>", 1)
+    )
     size_kb = png_path.stat().st_size / 1024
     if size_kb > 500:
         print(f"  warning: {png_path.name} is {size_kb:.0f}KB, over the 500KB target")
