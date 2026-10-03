@@ -1,5 +1,5 @@
-"""Data-loading and computation helpers for the dashboard (build guide
-Section 9), kept separate from app.py's Streamlit calls so the logic can
+"""Data-loading and computation helpers for the dashboard,
+kept separate from app.py's Streamlit calls so the logic can
 be unit tested directly -- app.py should contain no computation of its
 own, only `st.*` presentation calls against what this module returns.
 """

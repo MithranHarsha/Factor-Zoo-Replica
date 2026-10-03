@@ -148,7 +148,7 @@ def _real_sample_years(con: duckdb.DuckDBPyConnection) -> float:
     (when a fact actually became knowable), not `period_end` (which can
     reach earlier via prior-year comparative figures inside a later
     filing) -- the same distinction the point-in-time rule itself turns
-    on (build guide Section 4)."""
+    on."""
     lo, hi = con.execute("SELECT MIN(filed), MAX(filed) FROM xbrl_facts").fetchone()
     return (hi - lo).days / 365.25
 

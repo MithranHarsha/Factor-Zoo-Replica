@@ -1,4 +1,4 @@
-"""Distress / quality factors (build guide Section 5, factors #44-48)."""
+"""Distress / quality factors (factors #44-48)."""
 
 from __future__ import annotations
 

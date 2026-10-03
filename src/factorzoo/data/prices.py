@@ -3,8 +3,8 @@ Stooq (documented as a free fallback, but see the live finding below), and
 Tiingo (free tier with a 500-symbol/month cap, needed for delisted-ticker
 history).
 
-**Phase 1 live finding, superseding the build guide's documented plan:**
-As of this build, Stooq's bulk CSV endpoint (`/q/d/l/?s=...`) returns an
+**Phase 1 live finding:** Stooq was the original plan for primary price
+source, but as of this build, its bulk CSV endpoint (`/q/d/l/?s=...`) returns an
 HTML page behind a JavaScript bot-check for any non-browser client -- a
 plain `requests`/`httpx` GET gets either a 404 or a JS-challenge page, HTTP
 200 notwithstanding, even with a browser User-Agent and cookies replayed.
@@ -128,8 +128,7 @@ def _is_rate_limit_error(exc: BaseException) -> bool:
 
 # Live finding (this build): Yahoo's chart endpoint returned a sustained
 # 429 on query1 while query2 served real data seconds later -- an
-# "undocumented threshold" exactly as flagged in the build guide, and
-# per-host rather than per-account. Retrying each host a couple of times
+# undocumented threshold, and per-host rather than per-account. Retrying each host a couple of times
 # with backoff, then falling through to the next host, is a direct, tested
 # response to that, not a hypothetical precaution.
 _yahoo_host_retry = retry(
@@ -198,8 +197,7 @@ def fetch_yahoo_chart_daily(
 ) -> pd.DataFrame:
     """Download daily OHLCV history for one ticker from Yahoo Finance's
     public chart API, called directly (not via the `yfinance` package,
-    which has documented rate-limit/blocking issues of its own -- see the
-    build guide, Section 4). This is the project's current default primary
+    which has documented rate-limit/blocking issues of its own). This is the project's current default primary
     price source; see this module's docstring for why Stooq is not, and
     why this goes through curl rather than httpx.
     """
@@ -264,7 +262,7 @@ def fetch_tiingo_daily(
     will not silently skip a source and pretend it succeeded.
 
     Caller is responsible for budgeting the free tier's 500 unique
-    symbols/month cap (build guide, Section 4); this function does not
+    symbols/month cap; this function does not
     track usage across calls.
     """
     if not settings.tiingo_api_key:
@@ -322,8 +320,8 @@ class TiingoBudget:
     """Tracks how many *distinct* symbols have been pulled this calendar
     month against the free tier's 500-symbol cap, so a pilot run fails
     loudly with a clear message instead of silently hitting HTTP 429s
-    partway through (build guide Section 4's named asterisk on "zero paid
-    data" at full scale)."""
+    partway through -- the named asterisk on "zero paid data" at full
+    scale."""
 
     def __init__(self, cap: int = 500, ledger_path: Path | None = None) -> None:
         self.cap = cap

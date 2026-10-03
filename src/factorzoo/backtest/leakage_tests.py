@@ -1,4 +1,4 @@
-"""The shuffle test (build guide Section 8, leakage test #4): randomly
+"""The shuffle test (leakage test #4): randomly
 reshuffle one factor's cross-sectional values within each formation date
 (destroys real predictive content but preserves the panel's shape) and
 confirm its long-short t-statistic collapses toward zero. A basic sanity
@@ -9,7 +9,7 @@ flip baked into the data path, a leakage channel elsewhere in the
 pipeline) would NOT disappear under shuffling, which is exactly what this
 test is for.
 
-Leakage tests #1-3 from Section 8 (every factor value's available_date
+Leakage tests #1-3 (every factor value's available_date
 <= formation date; an amendment never overwrites a pre-amendment vintage;
 universe size/coverage reported per year) are exercised directly by
 pit_store.get_facts_as_of and universe.filters.summarize_coverage and

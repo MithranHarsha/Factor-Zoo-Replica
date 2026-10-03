@@ -1,4 +1,4 @@
-"""Streamlit dashboard (build guide Section 9). Five pages: Zoo Overview,
+"""Streamlit dashboard. Five pages: Zoo Overview,
 Factor Detail, Correlation Map, Taming Report, Data Health. Reads only
 from the point-in-time store (never recomputes a full pipeline run), so
 it stays fast and can be redeployed independently of a data refresh --
@@ -65,7 +65,7 @@ def page_data_health(con) -> None:
         st.warning(
             "No price data loaded yet. Price-based factors (momentum, trading-frictions, value-category "
             "ratios needing market cap) will show as 'needs price data' on the Zoo Overview page until "
-            "`factorzoo pull-prices` succeeds -- see the build guide's live finding on free price-source "
+            "`factorzoo pull-prices` succeeds -- see the live finding on free price-source "
             "rate limiting (data/prices.py's module docstring) for why that may take a few tries."
         )
 
@@ -128,12 +128,13 @@ def page_correlation_map(con) -> None:
     st.header("Correlation Map")
     st.caption(
         "Factor-by-factor correlation of long-short returns, with hierarchical clusters outlined "
-        "(build guide Section 7) -- the visual version of 'which factors are near-duplicates'."
+        "-- the visual version of 'which factors are near-duplicates'."
     )
     st.info(
         "This page reads from a factor-return time series table that Phase 3's backtest run "
         "populates (one column per factor, one row per formation date). None has been computed into "
-        "the store yet in this build -- see the build guide's live finding on price-data access. "
+        "the store yet in this build -- see the live finding on price-data access "
+        "(data/prices.py's module docstring). "
         "The underlying mechanics (factorzoo.taming.dimension_reduction.correlation_clusters) are "
         "implemented and unit-tested; this page will render as soon as a backtest run's long-short "
         "return series are written back to the store."
@@ -144,7 +145,7 @@ def page_taming_report(con) -> None:
     st.header("Taming Report")
     st.caption(
         "How many factors survive each stage of the multiple-testing and dimension-reduction "
-        "pipeline (build guide Section 7)."
+        "pipeline."
     )
     st.info(
         "Populated once a full backtest run has produced a long-short return series for every "

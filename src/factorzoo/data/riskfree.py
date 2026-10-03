@@ -1,8 +1,8 @@
 """Kenneth French Data Library loader: risk-free rate and benchmark factors.
 
-Used only for validation (build guide Section 4 and Section 8): the
-replica's own from-scratch market/size/value portfolios should correlate
-above ~0.9 with these before any new factor result is trusted.
+Used only for validation: the replica's own from-scratch market/size/value
+portfolios should correlate above ~0.9 with these before any new factor
+result is trusted.
 """
 
 from __future__ import annotations

@@ -1,4 +1,4 @@
-"""Step 1 of statistical taming (build guide Section 7): t-stat hurdles,
+"""Step 1 of statistical taming: t-stat hurdles,
 false-discovery-rate control, the Deflated Sharpe Ratio, and the
 Probability of Backtest Overfitting -- the tools that answer "how much of
 the zoo's apparent performance is multiple-testing luck."
@@ -39,7 +39,7 @@ def benjamini_yekutieli(pvalues: pd.Series, q: float = 0.05) -> pd.Series:
     """BY (2001) FDR control: the same procedure as BH but with the
     threshold divided by c(m) = sum_{i=1}^{m} 1/i (the m-th harmonic
     number), which stays valid under arbitrary dependence between tests
-    -- the build guide's reason for using it alongside BH, since this
+    -- the reason to use it alongside BH, since this
     project's factors are correlated with each other by construction."""
     valid_m = pvalues.notna().sum()
     harmonic = float(np.sum(1.0 / np.arange(1, max(valid_m, 1) + 1)))

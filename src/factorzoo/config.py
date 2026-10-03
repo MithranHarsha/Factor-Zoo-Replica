@@ -1,6 +1,6 @@
 """Central configuration: paths, environment variables, pull parameters.
 
-Phase 1 note (see Section 4 of the build guide): SEC EDGAR requires a
+Phase 1 note: SEC EDGAR requires a
 descriptive User-Agent on every request. There is no safe default for this
 -- making one up risks looking like abusive/anonymous traffic -- so
 ``SEC_USER_AGENT`` is a required environment variable and the app fails
@@ -59,7 +59,7 @@ def load_settings(require_tiingo: bool = False) -> Settings:
     if require_tiingo and not tiingo_key:
         raise ConfigError(
             "TIINGO_API_KEY is not set. Tiingo is only needed for delisted-ticker "
-            "price backfill (see the build guide, Section 4). Register for a free "
+            "price backfill. Register for a free "
             "key at https://www.tiingo.com/ and add it to .env, or skip Tiingo pulls."
         )
 

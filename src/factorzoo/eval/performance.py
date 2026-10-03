@@ -1,7 +1,6 @@
 """Return/risk performance statistics, principally the Newey-West
-adjusted t-statistic (build guide Section 7): "compute the Newey-West
-adjusted t-statistic on its value-weighted long-short return, which
-corrects for autocorrelation and is standard in this literature."
+adjusted t-statistic on a value-weighted long-short return, which
+corrects for autocorrelation and is standard in this literature.
 """
 
 from __future__ import annotations

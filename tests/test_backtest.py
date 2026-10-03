@@ -1,5 +1,4 @@
-"""Offline tests for the shuffle test and walk-forward split helper
-(build guide Section 8)."""
+"""Offline tests for the shuffle test and walk-forward split helper."""
 
 from __future__ import annotations
 

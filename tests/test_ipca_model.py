@@ -1,4 +1,4 @@
-"""Offline tests for the IPCA wrapper (build guide Section 7). Fits are
+"""Offline tests for the IPCA wrapper. Fits are
 on small synthetic panels -- IPCA's ALS estimator is iterative and not
 free, so these stay small (tens of entities, tens of periods) rather than
 pilot-scale, which is enough to confirm the wrapper's data plumbing and

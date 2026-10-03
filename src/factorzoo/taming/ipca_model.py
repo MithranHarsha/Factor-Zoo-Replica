@@ -1,5 +1,5 @@
 """Instrumented Principal Component Analysis (Kelly, Pruitt & Su,
-2019/2020) -- build guide Section 7: fit with 1 to 6 latent factors,
+2019/2020): fit with 1 to 6 latent factors,
 using firm characteristics as instruments, and compare total vs.
 predictive R-squared to choose K. Thin wrapper around the `ipca` package
 (github.com/bkelly-lab/ipca, `pip install ipca`), which does the actual
@@ -89,8 +89,8 @@ def fit_ipca(characteristics: pd.DataFrame, returns: pd.Series, n_factors: int, 
 
 
 def pca_benchmark_r2(returns_wide: pd.DataFrame, n_factors: int) -> float:
-    """Naive PCA-on-returns baseline (build guide Section 7: "compare
-    against a naive PCA-on-returns benchmark"). `returns_wide` is a
+    """Naive PCA-on-returns baseline, to compare against the IPCA fit
+    above. `returns_wide` is a
     time x entity matrix (unlike IPCA's long panel); entities/periods with
     any missing data are dropped, since plain PCA has no missing-data
     handling of its own (that gap is exactly the kind of thing IPCA, built

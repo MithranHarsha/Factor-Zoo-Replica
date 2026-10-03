@@ -1,5 +1,5 @@
 """Importing this package registers all 48 starter-library factors
-(build guide Section 5) into FACTOR_REGISTRY as a side effect."""
+into FACTOR_REGISTRY as a side effect."""
 
 from factorzoo.factors import (
     accruals,

@@ -1,5 +1,5 @@
 """Offline tests for point-in-time universe construction -- the
-survivorship-bias fix from build guide Section 4. A synthetic membership
+survivorship-bias fix. A synthetic membership
 history stands in for the real S&P 500 dataset so these never touch the
 network.
 """

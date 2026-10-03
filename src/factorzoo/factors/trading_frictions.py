@@ -1,4 +1,4 @@
-"""Trading-frictions / risk factors (build guide Section 5, factors
+"""Trading-frictions / risk factors (factors
 #36-43). Size uses the annual panel (market cap already lives there via
 factors/panel.py's attach_market_cap); the rest are pure price-based
 signals on the monthly panel. A few (idiosyncratic volatility, beta,
@@ -121,8 +121,8 @@ max_daily_return = register(
 
 def _market_beta(p: pd.DataFrame) -> pd.Series:
     """Rolling 36-month beta via the covariance/variance identity
-    (equivalent to a univariate OLS slope), not a literal 60-month
-    regression per the guide's headline description -- shortened window
+    (equivalent to a univariate OLS slope), not the more conventional
+    60-month window -- shortened window
     since 60 months of monthly history isn't available this early in the
     project, and the cov/var shortcut avoids a per-group statsmodels loop.
     """
@@ -142,7 +142,7 @@ market_beta = register(
         name="market_beta",
         category="trading_frictions",
         description="Rolling 36-month CAPM beta vs. the Fama-French market return (cov/var "
-        "shortcut, equivalent to an OLS slope). Shortened from the guide's headline 60-month "
+        "shortcut, equivalent to an OLS slope). Shortened from the more conventional 60-month "
         "window since this early in the project there isn't 60 months of panel history yet; "
         "revisit once more history has accumulated. Requires `mkt_return` joined onto the panel.",
         source="Frazzini & Pedersen (2014)",

@@ -127,7 +127,7 @@ class TestExtractXbrlFacts:
         assert "SomeOtherTagNotRequested" not in df["tag"].unique()
 
     def test_original_and_amended_filings_both_retained(self):
-        # The core correctness requirement from the build guide: an
+        # The core correctness requirement: an
         # amendment is a NEW vintage row, never an in-place overwrite.
         df = extract_xbrl_facts(SYNTHETIC_FACTS_JSON, tags=("Assets",))
         same_period = df[(df["tag"] == "Assets") & (df["period_end"] == pd.Timestamp("2023-12-31"))]

@@ -1,5 +1,5 @@
 """Offline tests for the FF3 replication and the Ken French correlation
-gate (Phase 2's gate, build guide Section 10). Synthetic data engineered
+gate (Phase 2's gate). Synthetic data engineered
 so the replica's SMB/HML should correlate near-perfectly with a
 hand-constructed "French" series built from the SAME underlying size/value
 effect -- proving the mechanism works, independent of whether live price

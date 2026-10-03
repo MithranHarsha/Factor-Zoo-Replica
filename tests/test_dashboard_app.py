@@ -1,5 +1,5 @@
-"""Offline test for the dashboard's demo-snapshot bootstrap (build guide
-Section 9): a fresh deploy with no persistent volume (Streamlit Community
+"""Offline test for the dashboard's demo-snapshot bootstrap: a fresh
+deploy with no persistent volume (Streamlit Community
 Cloud) has no point-in-time store at all, so app.py copies the committed
 80-company demo snapshot into place on first run. Local development,
 where DB_PATH already exists from running the CLI pull commands, must be

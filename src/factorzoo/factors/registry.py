@@ -1,5 +1,5 @@
 """The factor registry: one FactorSpec per signal, so adding factor 49
-never touches existing code (build guide Section 5).
+never touches existing code.
 
 Every category module (value.py, profitability.py, ...) registers its
 factors as an import side effect; factors/__init__.py imports all of them

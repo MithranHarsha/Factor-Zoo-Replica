@@ -1,10 +1,10 @@
 """The point-in-time data store: DuckDB + Parquet-backed, filed-date indexed.
 
-Build guide Section 4's rule made concrete in a schema: every XBRL fact
+The point-in-time rule made concrete in a schema: every XBRL fact
 carries its own `available_date`, every filing is kept as its own immutable
 vintage row keyed by `accn` (a 10-K/A never overwrites the original), and
 any query for "what did we know as of date D" is a WHERE clause on
-`available_date`, not a join on period_end. Section 8's leakage test is
+`available_date`, not a join on period_end. The leakage test is
 exactly `get_facts_as_of` used with an assertion.
 """
 
@@ -125,7 +125,8 @@ def _git_commit() -> str | None:
 
 def record_manifest(con: duckdb.DuckDBPyConnection, component: str, detail: dict) -> None:
     """Every pull writes a manifest row: what ran, when, against what code
-    (build guide Section 8's reproducibility requirement)."""
+    -- the reproducibility requirement every other table's provenance
+    depends on."""
     con.execute(
         "INSERT INTO pull_manifest VALUES (?, ?, ?, ?)",
         [datetime.now(UTC), component, json.dumps(detail, default=str), _git_commit()],
@@ -234,7 +235,7 @@ def get_facts_as_of(
 
 def get_universe_as_of(con: duckdb.DuckDBPyConnection, as_of: str | pd.Timestamp) -> list[str]:
     """Nearest formation_date at or before `as_of` (universe is formed
-    monthly, build guide Section 6)."""
+    monthly)."""
     row = con.execute(
         "SELECT MAX(formation_date) FROM universe_membership WHERE formation_date <= ?",
         [pd.Timestamp(as_of)],

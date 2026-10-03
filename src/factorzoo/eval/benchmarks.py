@@ -1,14 +1,13 @@
 """Replicates the market, SMB, and HML factors from this project's own
 point-in-time data and compares them to Kenneth French's published series
--- Phase 2's actual gate (build guide Section 10): "FF3 correlation above
-0.9 vs. Ken French." Below 0.9, Section 8 says to treat it as a
-methodology bug in the replica, not a finding.
+-- Phase 2's actual gate: FF3 correlation above 0.9 vs. Ken French. Below
+0.9, treat it as a methodology bug in the replica, not a finding.
 
 SMB and HML use the real Fama-French 2x3 double sort (size median split x
 book-to-market 30/70 split, both computed from the large-cap breakpoint
-subset per Section 6), not a simplified single-factor decile spread --
-the double sort is what the published series itself is built from, so
-it's the only construction with a real chance of clearing the 0.9 bar.
+subset), not a simplified single-factor decile spread -- the double sort
+is what the published series itself is built from, so it's the only
+construction with a real chance of clearing the 0.9 bar.
 """
 
 from __future__ import annotations
@@ -26,8 +25,8 @@ def fama_french_2x3_breakpoints(
     df: pd.DataFrame, size_col: str, value_col: str, market_cap_col: str = "market_cap"
 ) -> dict:
     """Size median and B/M 30th/70th percentile breakpoints, computed
-    from the large-cap subset (build guide Section 6's NYSE-breakpoint
-    proxy), applied to the full universe. Returned separately from the
+    from the large-cap subset (the NYSE-breakpoint proxy -- see
+    portfolios/sorts.py), applied to the full universe. Returned separately from the
     bucket assignment so tests can check the breakpoint VALUES directly.
     """
     valid = df.dropna(subset=[size_col, value_col, market_cap_col])
@@ -129,9 +128,9 @@ def validate_against_french(replica: pd.DataFrame, french: pd.DataFrame, min_ove
     this, since the replica is monthly by construction).
 
     Returns one row per factor with the correlation and whether it clears
-    the 0.9 gate (build guide Section 10); below that, Section 8 says
-    treat it as a methodology bug, not a finding -- this function reports
-    the number, the call on what it means is the caller's.
+    the 0.9 gate; below that, treat it as a methodology bug, not a
+    finding -- this function reports the number, the call on what it
+    means is the caller's.
     """
     pairs = [("mkt", "mkt_rf", "market"), ("smb", "smb", "SMB"), ("hml", "hml", "HML")]
     # replica and french both use "smb"/"hml" as column names, so a bare

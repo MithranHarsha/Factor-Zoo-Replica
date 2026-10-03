@@ -1,4 +1,4 @@
-"""Accruals / earnings-quality factors (build guide Section 5, factors
+"""Accruals / earnings-quality factors (factors
 #24-27). All negative-weight: high accruals predict LOWER returns."""
 
 from __future__ import annotations

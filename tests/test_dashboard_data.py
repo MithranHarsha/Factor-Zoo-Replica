@@ -1,5 +1,5 @@
-"""Offline tests for the dashboard's data-loading helpers (build guide
-Section 9), against a small synthetic store built with the same schema
+"""Offline tests for the dashboard's data-loading helpers, against a
+small synthetic store built with the same schema
 as production (not the real project database, so these stay deterministic
 and don't depend on what's been pulled into data/factorzoo.duckdb so far).
 """

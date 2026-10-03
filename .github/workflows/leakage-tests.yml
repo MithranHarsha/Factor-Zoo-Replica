@@ -21,7 +21,7 @@ jobs:
       - name: Install project
         run: uv sync --all-extras
 
-      - name: Leakage / point-in-time tests only (build guide Section 8)
+      - name: Leakage / point-in-time tests only
         # The subset of the suite that directly checks for look-ahead bias:
         # the shuffle test, available_date gating in get_facts_as_of and
         # the point-in-time snapshot, and universe membership leakage.

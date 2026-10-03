@@ -1,5 +1,5 @@
-"""Offline tests for decile sorting, weighting, and the long-short spread
-(build guide Section 6). Synthetic cross-sections with known, hand-worked
+"""Offline tests for decile sorting, weighting, and the long-short spread.
+Synthetic cross-sections with known, hand-worked
 answers -- these are the mechanics every factor's backtest depends on, so
 bugs here would silently corrupt every single factor's result.
 """
@@ -64,7 +64,7 @@ class TestAssignQuantileBuckets:
         # by market cap are systematically different from the small-cap
         # majority. The breakpoints must reflect the large-cap subset,
         # not the full-universe distribution -- that's the entire point
-        # of the proxy (build guide Section 6).
+        # of the proxy.
         n = 400
         df = pd.DataFrame(
             {

@@ -1,9 +1,8 @@
-"""Offline tests for the 48-factor starter library (build guide Section
-5). Two layers: a registry-wide smoke test (every factor computes without
-error on a synthetic panel shaped the way it expects), and hand-computed
-spot checks for a representative factor per category, including a direct
-regression test for the groupby-across-companies bug the Phase 1 critique
-flagged in momentum_12_1.
+"""Offline tests for the 48-factor starter library. Two layers: a
+registry-wide smoke test (every factor computes without error on a
+synthetic panel shaped the way it expects), and hand-computed spot checks
+for a representative factor per category, including a direct regression
+test for a groupby-across-companies bug once found in momentum_12_1.
 """
 
 from __future__ import annotations
@@ -123,7 +122,7 @@ class TestRegistryShape:
         for spec in f.FACTOR_REGISTRY.values():
             assert spec.panel in ("annual", "monthly"), f"{spec.name} has invalid panel '{spec.panel}'"
 
-    def test_category_counts_match_build_guide_table(self):
+    def test_category_counts_match_expected_counts(self):
         expected = {
             "momentum": 6, "value": 6, "profitability": 6, "investment": 5,
             "accruals": 4, "financing": 4, "intangibles": 4, "trading_frictions": 8, "distress": 5,

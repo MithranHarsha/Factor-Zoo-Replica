@@ -1,9 +1,9 @@
-"""Momentum factors (build guide Section 5, factors #1-6). All operate on
+"""Momentum factors (factors #1-6). All operate on
 the monthly price panel (factors/panel.py's `build_monthly_price_panel`),
-grouped and rolled per entity_id_hint -- the exact groupby pattern the
-build guide's worked example uses, which the Phase 1 critique flagged as
-missing in an earlier draft (a momentum column computed without grouping
-by entity rolls returns across different companies at the panel's seams).
+grouped and rolled per entity_id_hint -- a momentum column computed
+without grouping by entity rolls returns across different companies at
+the panel's seams, so every rolling window here is explicitly
+per-entity.
 """
 
 from __future__ import annotations
@@ -128,7 +128,7 @@ industry_momentum = register(
         description="Industry-average (SIC code) 12-1 momentum. Requires the monthly panel to "
         "have a `sic` column pre-joined via momentum.attach_industry(con, panel) -- the only "
         "factor in this registry with that extra requirement, since SIC lives in EDGAR's "
-        "submissions endpoint, not in price data (build guide Section 4).",
+        "submissions endpoint, not in price data).",
         source="Moskowitz & Grinblatt (1999)",
         lag_days=0,
         direction=+1,

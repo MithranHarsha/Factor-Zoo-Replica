@@ -6,27 +6,24 @@
 
 A free-data, point-in-time-correct replication of the academic cross-sectional
 factor zoo, with statistical taming (multiple-testing correction + dimension
-reduction). Full design document: `Factor_Zoo_Replica_Build_Guide.pdf` /
-the companion [build guide](https://claude.ai/artifact/Rf8XmMJxCfJWc8GY6KJoiW)
-in this folder.
+reduction).
 
 No WRDS/CRSP/Compustat subscription is used anywhere. Data sources:
 SEC EDGAR (fundamentals), Yahoo Finance + Tiingo (prices -- see the live
-finding below on why Stooq, the guide's originally documented primary
+finding below on why Stooq, originally planned as the primary price
 source, isn't used by default), Ken French Data Library (validation
 benchmarks), and a historical S&P 500 membership dataset (universe).
 
 ## Status
 
 **Phases 1-5 are built and unit-tested** (234 offline tests, all passing
-in CI). See the build guide, Section 10, for the full phased plan and
-each phase's gate.
+in CI).
 
 | Phase | What's there | Gate status |
 | --- | --- | --- |
 | 1. Setup & Data Foundations | EDGAR client, point-in-time store, universe construction, Ken French loader, price clients | **Met.** Real data pulled: 1,209 historical tickers, **850,304 XBRL facts for 298 real companies** (incl. Apple), 15,897 days of FF5 factors. |
-| 2. Core Factor Library | All 48 starter-library factors (build guide Section 5), registry + panel-building machinery | **Code complete, unit-tested, and run on real data.** 35 of 48 factors (everything that doesn't need market cap) computed live against the 298-company panel -- see Sample Results below. The FF3-vs-Ken-French correlation gate needs price data (see below) to run live; the replication mechanism itself (a proper 2x3 Fama-French sort) is implemented and tested against synthetic data with known answers. |
-| 3. Portfolios & Backtesting | Decile/quintile sorts with the large-cap breakpoint proxy, VW/EW weighting, long-short spreads, the Section 8 shuffle test, walk-forward splits | **Code complete, unit-tested.** Awaits price data to run on the real universe at scale. |
+| 2. Core Factor Library | All 48 starter-library factors, registry + panel-building machinery | **Code complete, unit-tested, and run on real data.** 35 of 48 factors (everything that doesn't need market cap) computed live against the 298-company panel -- see Sample Results below. The FF3-vs-Ken-French correlation gate needs price data (see below) to run live; the replication mechanism itself (a proper 2x3 Fama-French sort) is implemented and tested against synthetic data with known answers. |
+| 3. Portfolios & Backtesting | Decile/quintile sorts with the large-cap breakpoint proxy, VW/EW weighting, long-short spreads, the shuffle test, walk-forward splits | **Code complete, unit-tested.** Awaits price data to run on the real universe at scale. |
 | 4. Statistical Taming | t-hurdles, Benjamini-Hochberg/Yekutieli FDR, Deflated Sharpe Ratio, Probability of Backtest Overfitting (CSCV), correlation clustering, LASSO spanning test, IPCA (via the `ipca` package) | **Code complete, unit-tested.** |
 | 5. Dashboard & Polish | Streamlit app (5 pages), Docker packaging | **Built and smoke-tested live** (launched, health-checked, confirmed error-free against the real project database). Correlation Map / Taming Report pages are implemented but show an honest "waiting on price data" message until Phase 3 has real return series to summarize. |
 
@@ -57,7 +54,7 @@ frictions) and are blocked on the price-data gap below.
 Two independent, verified findings from this build, documented in detail
 in `src/factorzoo/data/prices.py`'s module docstring:
 
-1. **Stooq** (the guide's originally documented primary source) returns a
+1. **Stooq** (originally planned as the primary price source) returns a
    JavaScript bot-check page to any non-browser client, confirmed live
    even with a browser User-Agent and replayed cookies. Not currently
    usable for automated pulls.
@@ -102,7 +99,7 @@ GitHub Pages is enabled.
 | ![Hurdle surface](docs/img/hurdle_surface.png) | **How many tests you ran sets the required significance bar.** Bonferroni α=5% over this replica's real 48-factor registry and 17.5-year real EDGAR span requires \|t\| ≈ 3.33 -- well above the naive \|t\|>2 textbook cutoff -- vs. Hou-Xue-Zhang (2020)'s cited 452 tests / ~55 years. |
 | ![DSR surface](docs/img/dsr_surface.png) | **ILLUSTRATION.** How many strategies you tried deflates an impressive Sharpe ratio (Bailey & López de Prado 2014's Deflated Sharpe Ratio, closed form). Parametric surface, not fit to real trials -- a real per-factor overlay needs price-derived long-short Sharpe ratios (Phase 3, blocked on price data below). |
 | ![DSR surface, rotating](docs/img/dsr_surface_rotating.gif) | Same illustration, 36-frame rotating view. |
-| ![Factor correlation cluster heatmap](docs/img/cluster_heatmap.png) | **Real cross-sectional correlation** among 25 fundamentals-only factors across 296 real EDGAR companies, ordered by hierarchical clustering. 3 multi-factor clusters emerge (outlined in yellow) -- candidates `taming/dimension_reduction.py::correlation_clusters` would collapse to one representative each once return data exists. This is value correlation, not yet the long-short return correlation Section 7's funnel below uses. |
+| ![Factor correlation cluster heatmap](docs/img/cluster_heatmap.png) | **Real cross-sectional correlation** among 25 fundamentals-only factors across 296 real EDGAR companies, ordered by hierarchical clustering. 3 multi-factor clusters emerge (outlined in yellow) -- candidates `taming/dimension_reduction.py::correlation_clusters` would collapse to one representative each once return data exists. This is value correlation, not yet the long-short return correlation the taming funnel below would use. |
 | ![Universe size by year](docs/img/universe_by_year.png) | **Real point-in-time S&P 500 membership size by year** (1996-2026), with how much of each year's universe this build has actually pulled real EDGAR facts for -- 298 of 503 tickers as of 2026. (Adapted from "S&P 1500 overlap": this replica's universe source is S&P 500, not 1500 -- see Limitations.) |
 
 **Blocked on price data** (see *Live finding* above) -- skipped honestly by
@@ -197,7 +194,7 @@ immediately rather than starting empty.
 ```bash
 uv run pytest            # offline tests only (default) -- 234 tests, synthetic fixtures with known answers
 uv run pytest -m network # include tests that hit live data sources (SEC EDGAR, Yahoo, Stooq, Ken French)
-uv run pytest -m leakage # just the point-in-time / look-ahead-bias leakage tests (build guide Section 8)
+uv run pytest -m leakage # just the point-in-time / look-ahead-bias leakage tests
 ```
 
 ## Repository layout

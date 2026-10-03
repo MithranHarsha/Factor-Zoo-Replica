@@ -40,7 +40,7 @@ testpaths = ["tests"]
 addopts = "-m 'not network'"
 markers = [
     "network: tests that make real HTTP calls to live data sources (run with -m network)",
-    "leakage: point-in-time / look-ahead-bias leakage tests (build guide Section 8)",
+    "leakage: point-in-time / look-ahead-bias leakage tests",
 ]
 
 [tool.ruff]

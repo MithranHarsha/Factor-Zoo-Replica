@@ -1,4 +1,4 @@
-"""Step 2 of statistical taming (build guide Section 7): correlation
+"""Step 2 of statistical taming: correlation
 clustering to find near-duplicate factors, and a LASSO/elastic-net
 spanning test (Feng, Giglio & Xiu's two-pass idea, simplified) to check
 whether a candidate factor adds explanatory power beyond a spanning set
@@ -42,8 +42,8 @@ def correlation_clusters(factor_returns: pd.DataFrame, distance_threshold: float
 
 def select_cluster_representatives(cluster_labels: pd.Series, abs_tstats: pd.Series) -> list[str]:
     """One representative per cluster: the factor with the largest
-    |t-statistic| in that cluster (build guide Section 7: "keep one
-    representative factor per cluster")."""
+    |t-statistic| in that cluster, i.e. keep one representative factor
+    per cluster."""
     aligned = abs_tstats.reindex(cluster_labels.index).abs()
     df = pd.DataFrame({"cluster": cluster_labels, "abs_t": aligned})
     return df.groupby("cluster")["abs_t"].apply(lambda s: s.idxmax()).tolist()

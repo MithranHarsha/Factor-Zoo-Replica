@@ -1,4 +1,4 @@
-"""Profitability factors (build guide Section 5, factors #13-18). All
+"""Profitability factors (factors #13-18). All
 operate on the annual snapshot (factors/panel.py); none need market_cap
 except implicitly through exclusion rules, so these still work even before
 price data is available -- unlike the value factors.

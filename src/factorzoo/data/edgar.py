@@ -5,7 +5,7 @@ Every function that hits the network is paired with a pure function that
 does the same parsing/logic off already-downloaded JSON, so the point-in-time
 rule and tag extraction can be unit tested without a network call.
 
-Endpoints used (all free, no API key -- see build guide Section 4):
+Endpoints used (all free, no API key):
   - https://www.sec.gov/files/company_tickers.json           (ticker <-> CIK)
   - https://data.sec.gov/submissions/CIK##########.json       (SIC code, filing history)
   - https://data.sec.gov/api/xbrl/companyfacts/CIK##########.json  (XBRL facts)
@@ -30,7 +30,7 @@ COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik10}.json"
 COMPANYFACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik10}.json"
 
-# The starter factor library (build guide, Section 5) needs these us-gaap
+# The starter factor library needs these us-gaap
 # tags. Kept here, not buried in a notebook, because which tags a factor
 # needs is itself part of the spec.
 CORE_USGAAP_TAGS: tuple[str, ...] = (
@@ -120,9 +120,9 @@ class EdgarClient:
 
     def fetch_company_tickers(self, cache_path: Path | None = None, max_age_days: int = 7) -> pd.DataFrame:
         """Returns DataFrame[cik, ticker, title]. This is SEC's list of
-        *current* filers only -- see build guide Section 4: it is a CIK
-        lookup aid, never the primary universe source (that would
-        reintroduce survivorship bias by construction)."""
+        *current* filers only -- a CIK lookup aid, never the primary
+        universe source (that would reintroduce survivorship bias by
+        construction)."""
         cache_path = cache_path or (CACHE_DIR / "company_tickers.json")
         data = self._load_or_fetch(cache_path, COMPANY_TICKERS_URL, max_age_days)
         rows = [
@@ -246,7 +246,7 @@ def extract_xbrl_facts(
     return df
 
 
-# --- the point-in-time rule (build guide, Section 4) -----------------------
+# --- the point-in-time rule --------------------------------------------
 
 ANNUAL_FLOOR_DAYS = 91
 QUARTERLY_FLOOR_DAYS = 45

@@ -1,7 +1,7 @@
-"""Bucket-level portfolio returns and the long-short spread (build guide
-Section 6): "Decile 10 minus Decile 1, sign-flipped according to the
-factor's direction field, so the spread is always defined as high
-expected return minus low expected return."
+"""Bucket-level portfolio returns and the long-short spread: Decile 10
+minus Decile 1, sign-flipped according to the factor's direction field,
+so the spread is always defined as high expected return minus low
+expected return.
 """
 
 from __future__ import annotations

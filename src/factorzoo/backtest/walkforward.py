@@ -1,9 +1,9 @@
-"""Expanding-window walk-forward splits (build guide Section 8): "fit any
-model parameter...on data through year Y, evaluate on year Y+1 only, and
-roll forward." Falls out of the point-in-time store directly (any as-of
+"""Expanding-window walk-forward splits: fit any
+model parameter on data through year Y, evaluate on year Y+1 only, and
+roll forward. Falls out of the point-in-time store directly (any as-of
 query only ever sees what was available by that date), so this module is
 just the date bookkeeping on top of that -- time-based splits only, never
-a random shuffle across the panel (Section 8's other explicit rule).
+a random shuffle across the panel.
 """
 
 from __future__ import annotations

@@ -1,10 +1,11 @@
-"""Decile (or quintile-fallback) sorting with the large-cap breakpoint
-proxy from build guide Section 6: true NYSE-only breakpoints need an
-exchange-listing flag this project's free data doesn't cleanly provide, so
-breakpoints are computed from the largest 25% of names by COUNT (not 60%
-of cumulative dollar market cap, which was the ambiguity the Phase 1
-critique flagged and the guide was corrected to fix), then applied to the
-full eligible universe.
+"""Decile (or quintile-fallback) sorting with a large-cap breakpoint
+proxy: true NYSE-only breakpoints need an exchange-listing flag this
+project's free data doesn't cleanly provide, so breakpoints are computed
+from the largest 25% of names by COUNT, not 60% of cumulative dollar
+market cap (the two are not interchangeable -- count-based is simpler to
+compute from this data but skews the cutoff toward smaller names than a
+true NYSE dollar-cap breakpoint would), then applied to the full eligible
+universe.
 """
 
 from __future__ import annotations

@@ -44,7 +44,7 @@ def build_universe_cmd(
 ) -> None:
     """Build the point-in-time universe panel from historical S&P 500
     membership and write it to the store. This is the survivorship-bias
-    fix from build guide Section 4: additions AND removals are both in the
+    fix: additions AND removals are both in the
     source data, not reconstructed after the fact.
     """
     ensure_data_dirs()
@@ -143,8 +143,8 @@ def pull_prices_cmd(
 ) -> None:
     """Pull daily price history for a pilot slice of the current universe.
 
-    Default source is Yahoo Finance's chart API (free, no key). Stooq is
-    documented in the build guide as the primary source but is currently
+    Default source is Yahoo Finance's chart API (free, no key). Stooq was
+    the original primary-source plan but is currently
     blocked behind a JavaScript bot-check for automated clients -- a live
     finding from this build, not a hypothetical -- see data/prices.py's
     module docstring. Pass --source stooq to retry it once that changes.

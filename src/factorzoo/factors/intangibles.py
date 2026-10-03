@@ -1,4 +1,4 @@
-"""Intangibles / R&D factors (build guide Section 5, factors #32-35)."""
+"""Intangibles / R&D factors (factors #32-35)."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ advertising_to_market = register(
         category="intangibles",
         description="Proxy: 30% of SG&A (advertising is not broken out as its own standardized "
         "XBRL tag -- it is usually folded into SellingGeneralAndAdministrativeExpense -- so this "
-        "is a documented proxy, not a direct observation; see build guide Section 4). Divided by "
+        "is a documented proxy, not a direct observation). Divided by "
         "market cap.",
         source="Chan, Lakonishok & Sougiannis (2001)",
         lag_days=91,

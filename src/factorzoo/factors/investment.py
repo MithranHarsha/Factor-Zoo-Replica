@@ -1,4 +1,4 @@
-"""Investment factors (build guide Section 5, factors #19-23). All are
+"""Investment factors (factors #19-23). All are
 negative-weight: firms that invested/grew the most have historically
 earned LOWER subsequent returns."""
 

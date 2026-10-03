@@ -1,5 +1,4 @@
-"""Offline tests for Newey-West t-statistics and basic performance stats
-(build guide Section 7)."""
+"""Offline tests for Newey-West t-statistics and basic performance stats."""
 
 from __future__ import annotations
 

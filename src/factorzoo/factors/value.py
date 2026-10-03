@@ -1,4 +1,4 @@
-"""Value factors (build guide Section 5, factors #7-12). All operate on the
+"""Value factors (factors #7-12). All operate on the
 annual snapshot with market_cap attached (factors/panel.py) -- every one
 of these needs both a fundamentals figure and a market value.
 """
@@ -68,7 +68,7 @@ dividend_yield = register(
         name="dividend_yield",
         category="value",
         description="Trailing annual dividends paid divided by market cap (XBRL PaymentsOfDividends, "
-        "not a price vendor's dividend field -- see build guide Section 4).",
+        "not a price vendor's dividend field).",
         source="Litzenberger & Ramaswamy (1979)",
         lag_days=91,
         direction=+1,

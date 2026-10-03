@@ -1,5 +1,5 @@
-# Factor registry configuration -- owned by Phase 2 (Core Factor Library,
-# build guide Section 10). Left as a placeholder in Phase 1 so the config
+# Factor registry configuration -- owned by Phase 2 (Core Factor Library).
+# Left as a placeholder in Phase 1 so the config
 # directory's shape is settled before the factor code lands, rather than
 # bolted on afterward.
 #

@@ -1,4 +1,4 @@
-"""Financing / external-finance factors (build guide Section 5, factors
+"""Financing / external-finance factors (factors
 #28-31). All negative-weight: firms raising more capital (equity or debt)
 have historically earned LOWER subsequent returns."""
 

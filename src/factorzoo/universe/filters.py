@@ -1,6 +1,6 @@
 """Point-in-time universe construction.
 
-Build guide Section 4's fix: SEC's company_tickers.json lists only *current*
+The point-in-time fix: SEC's company_tickers.json lists only *current*
 EDGAR filers, so starting from it and trying to "add back" delisted names
 afterward has no real mechanism for knowing which names to add -- that is
 survivorship bias baked into the design, not an oversight that backfilling
@@ -31,8 +31,7 @@ SP500_HISTORY_URL = (
 SP500_HISTORY_SOURCE_NOTE = (
     "fja05680/sp500 (community-maintained S&P 500 historical constituents, "
     "originally sourced from 'Trading Evolved' by Andreas Clenow plus ongoing "
-    "Wikipedia-tracked changes). Free-data proxy universe, not CRSP-equivalent -- "
-    "see build guide Section 4."
+    "Wikipedia-tracked changes). Free-data proxy universe, not CRSP-equivalent."
 )
 
 

@@ -1,5 +1,5 @@
 """Offline tests for t-hurdles, FDR control, the Deflated Sharpe Ratio,
-and Probability of Backtest Overfitting (build guide Section 7)."""
+and Probability of Backtest Overfitting."""
 
 from __future__ import annotations
 

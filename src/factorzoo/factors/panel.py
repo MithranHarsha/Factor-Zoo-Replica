@@ -15,7 +15,7 @@ Two panels:
   a factor computed for a 2020 portfolio and a factor computed for the same
   company-year recomputed in 2026 can legitimately differ (the 2026 run
   sees a restatement the 2020 run couldn't have), which is correct, not a
-  bug -- see build guide Section 4's point-in-time rule.
+  bug -- see the point-in-time rule in data/pit_store.py.
 
 - **Monthly price panel** (`build_monthly_price_panel`): from daily prices,
   one row per company per month with the return, a volatility measure, and
@@ -52,7 +52,7 @@ DURATION_TAGS: frozenset[str] = frozenset(set(CORE_USGAAP_TAGS) | set(CORE_DEI_T
 
 # The panel's output column name for each tag, after fallback resolution
 # (e.g. Revenues and RevenueFromContractWithCustomerExcludingAssessedTax
-# both land in the "revenues" column -- build guide Section 4's fallback
+# both land in the "revenues" column -- a fallback
 # tag order, applied here rather than left to each factor to remember).
 TAG_TO_COLUMN: dict[str, str] = {
     "Assets": "assets",
@@ -265,7 +265,7 @@ def get_annual_factor_panel(
 
 
 def resolve_shares_outstanding(snapshot: pd.DataFrame) -> pd.Series:
-    """Fallback order from build guide Section 4: dei:EntityCommonStockSharesOutstanding
+    """Fallback order: dei:EntityCommonStockSharesOutstanding
     first, then us-gaap:CommonStockSharesOutstanding."""
     dei = snapshot.get("shares_outstanding_dei")
     gaap = snapshot.get("shares_outstanding_gaap")
@@ -332,7 +332,7 @@ def build_monthly_price_panel(
 
 def get_monthly_market_return(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
     """Monthly market return, compounded from the daily Fama-French
-    Mkt-RF + RF series (validation benchmark, build guide Section 4) --
+    Mkt-RF + RF series (validation benchmark) --
     used by the market-beta factor (trading_frictions.py) rather than
     building a second, redundant market-return series from this project's
     own (currently much smaller) price panel.

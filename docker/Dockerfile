@@ -18,8 +18,7 @@ COPY src ./src
 RUN uv pip install --system -e ".[dashboard,taming]"
 
 # DuckDB file and raw/cache pulls are meant to be mounted, not baked into
-# the image -- see build guide Section 8 ("mounted as a volume, so the
-# pipeline runs identically on any machine").
+# the image, so the pipeline runs identically on any machine.
 VOLUME ["/app/data"]
 
 EXPOSE 8501

@@ -1,5 +1,4 @@
-"""Offline tests for correlation clustering and the LASSO spanning test
-(build guide Section 7)."""
+"""Offline tests for correlation clustering and the LASSO spanning test."""
 
 from __future__ import annotations
 
