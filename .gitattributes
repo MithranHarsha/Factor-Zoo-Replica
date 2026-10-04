@@ -1,0 +1,5 @@
+*.png binary
+*.gif binary
+*.duckdb binary
+*.py text eol=lf
+*.md text eol=lf
