@@ -16,16 +16,36 @@ benchmarks), and a historical S&P 500 membership dataset (universe).
 
 ## Status
 
-**Phases 1-5 are built, unit-tested, and now run end-to-end on real data**
-(246 offline tests, all passing in CI).
+**Built, unit-tested, and now running end-to-end on real data** (246
+offline tests, all passing in CI).
 
-| Phase | What's there | Gate status |
-| --- | --- | --- |
-| 1. Setup & Data Foundations | EDGAR client, point-in-time store, universe construction, Ken French loader, price clients | **Met.** Real data pulled: 1,209 historical tickers, **850,304 XBRL facts for 298 real companies**, 279 of them with real daily price history (Tiingo), 15,897 days of FF5 factors. |
-| 2. Core Factor Library | All 48 starter-library factors, registry + panel-building machinery | **Met, on real data.** All 48 factors compute against the real panel; the FF3-vs-Ken-French gate (real SMB/HML/MKT from the replica's own 2x3 sort) runs live -- see Results below for the real correlations. |
-| 3. Portfolios & Backtesting | Decile/quintile sorts with the large-cap breakpoint proxy, VW/EW weighting, long-short spreads, the shuffle test, walk-forward splits | **Met, on real data.** `factorzoo run-backtest` forms real decile portfolios across 117 real monthly point-in-time cross-sections (2017-2026) and produces real long-short return series for every factor. |
-| 4. Statistical Taming | t-hurdles, Benjamini-Hochberg/Yekutieli FDR, Deflated Sharpe Ratio, Probability of Backtest Overfitting (CSCV), correlation clustering, LASSO spanning test, IPCA (via the `ipca` package) | **Met, on real data.** Real t-stats, DSR, correlation clusters, and an IPCA fit all run against the real return panel -- see the taming funnel in Results, which is the actual headline finding of this build. |
-| 5. Dashboard & Polish | Streamlit app (5 pages), Docker packaging | **Built and smoke-tested live** (launched, health-checked, confirmed error-free against the real project database). The Correlation Map / Taming Report pages predate `run-backtest`'s new result tables and still show their original "waiting on a return panel" message -- wiring them to the new tables is the next piece of unfinished work, not a blocked one. |
+- **Data foundations.** EDGAR client, point-in-time DuckDB store,
+  universe construction, Ken French loader, price clients. Real data
+  pulled: 1,209 historical tickers, **850,304 XBRL facts for 298 real
+  companies**, 279 of them with real daily price history (Tiingo),
+  15,897 days of FF5 factors.
+- **Core factor library.** All 48 starter-library factors compute
+  against the real panel; the FF3-vs-Ken-French gate (real SMB/HML/MKT
+  from the replica's own 2x3 sort) runs live -- see Results below for
+  the real correlations.
+- **Portfolios & backtesting.** Decile/quintile sorts with the
+  large-cap breakpoint proxy, VW/EW weighting, long-short spreads, the
+  shuffle test, walk-forward splits. `factorzoo run-backtest` forms
+  real decile portfolios across 117 real monthly point-in-time
+  cross-sections (2017-2026) and produces real long-short return series
+  for every factor.
+- **Statistical taming.** t-hurdles, Benjamini-Hochberg/Yekutieli FDR,
+  Deflated Sharpe Ratio, Probability of Backtest Overfitting (CSCV),
+  correlation clustering, LASSO spanning test, IPCA (via the `ipca`
+  package) -- all run against the real return panel. See the taming
+  funnel in Results, which is the actual headline finding of this build.
+- **Dashboard.** Streamlit app (5 pages), Docker packaging. Built and
+  smoke-tested live (launched, health-checked, confirmed error-free
+  against the real project database). The Correlation Map / Taming
+  Report pages predate `run-backtest`'s new result tables and still
+  show their original "waiting on a return panel" message -- wiring
+  them to the new tables is the next piece of unfinished work, not a
+  blocked one.
 
 ## Sample results (real data, 298 companies, as of this build)
 
@@ -71,7 +91,7 @@ detail in `src/factorzoo/data/prices.py`'s module docstring:
    hasn't been retried since.
 
 **Net effect:** with 279 real companies' price history in the store,
-`factorzoo run-backtest` runs the full Phase 3/4 pipeline for real --
+`factorzoo run-backtest` runs the full portfolios-and-taming pipeline for real --
 real decile sorts, real long-short returns, a real FF3-vs-Ken-French
 validation, and a real statistical-taming funnel. See Results below.
 
@@ -234,7 +254,7 @@ src/factorzoo/
   portfolios/            # sorts.py, weighting.py, returns.py
   eval/                  # performance.py (Newey-West), benchmarks.py (FF3 vs. Ken French)
   taming/                # multiple_testing.py, dimension_reduction.py, ipca_model.py
-  backtest/               # walkforward.py, leakage_tests.py (shuffle test), run_backtest.py (real Phase 3/4 pipeline)
+  backtest/               # walkforward.py, leakage_tests.py (shuffle test), run_backtest.py (the real portfolios-and-taming pipeline)
   dashboard/              # data.py (testable helpers), app.py (Streamlit presentation)
   viz/readme_figures.py   # README proof-of-work figures -- real data only, see its docstring
   cli.py
