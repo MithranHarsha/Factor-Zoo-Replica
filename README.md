@@ -16,7 +16,7 @@ benchmarks), and a historical S&P 500 membership dataset (universe).
 
 ## Status
 
-**Built, unit-tested, and now running end-to-end on real data** (246
+**Built, unit-tested, and now running end-to-end on real data** (252
 offline tests, all passing in CI).
 
 - **Data foundations.** EDGAR client, point-in-time DuckDB store,
@@ -119,7 +119,7 @@ Plotly.js via CDN) -- see **Interactive versions** below, or the link under each
 All 9 figures run on real data -- `make figures` has nothing left to skip.
 
 **The headline finding** (`taming_funnel.png`): of 43 real factors with a
-computed return series, 5 clear the naive \|t\|>2 textbook bar -- and
+computed return series, 8 clear the naive \|t\|>2 textbook bar -- and
 **zero** clear \|t\|>3 (the Harvey-Liu-Zhu multiple-testing-adjusted
 hurdle), Benjamini-Hochberg discovery at q=10%, or anything downstream
 of that. This is real evidence for the project's whole premise: most of
@@ -129,17 +129,17 @@ correction on an independent, out-of-sample universe.
 | | |
 |---|---|
 | ![Hurdle surface](docs/img/hurdle_surface.png) | **How many tests you ran sets the required significance bar.** Bonferroni α=5% over this replica's real 48-factor registry and 17.5-year real EDGAR span requires \|t\| ≈ 3.33 -- well above the naive \|t\|>2 textbook cutoff -- vs. Hou-Xue-Zhang (2020)'s cited 452 tests / ~55 years. [Open interactive 3D version](https://mithranharsha.github.io/Factor-Zoo-Replica/interactive/hurdle_surface.html) |
-| ![DSR surface](docs/img/dsr_surface.png) | **Surface is illustration** (parametric, Bailey & López de Prado 2014 closed form); **markers are real** -- all 43 backtested factors at their real (annualized Sharpe, DSR), red = did not survive BH. Best by DSR: `return_on_assets` (Sharpe 2.70, DSR 0.06 -- even the best real factor here is a weak deflated signal). [Open interactive 3D version](https://mithranharsha.github.io/Factor-Zoo-Replica/interactive/dsr_surface.html) |
+| ![DSR surface](docs/img/dsr_surface.png) | **Surface is illustration** (parametric, Bailey & López de Prado 2014 closed form); **markers are real** -- all 43 backtested factors at their real (annualized Sharpe, DSR), red = did not survive BH. Best by DSR: `piotroski_f_score` (Sharpe 1.36, DSR 0.91 -- the one real factor in this sample whose deflated Sharpe looks like genuine skill rather than noise; its own t-stat (2.12) still doesn't clear the \|t\|>3 funnel stage below). [Open interactive 3D version](https://mithranharsha.github.io/Factor-Zoo-Replica/interactive/dsr_surface.html) |
 | ![DSR surface, rotating](docs/img/dsr_surface_rotating.gif) | Same figure, 36-frame rotating view. |
 | ![Factor correlation cluster heatmap](docs/img/cluster_heatmap.png) | **Real cross-sectional correlation** among 35 fundamentals-only factors across 298 real EDGAR companies, ordered by hierarchical clustering. 5 multi-factor clusters emerge (outlined in yellow), the largest being the classic value cluster (`size`, `dividend_yield`, `earnings_to_price`, `book_to_market`, `cash_flow_to_price`, ...). This is cross-sectional value correlation, a different question from the long-short return correlation `taming_funnel.png` uses. [Open interactive version](https://mithranharsha.github.io/Factor-Zoo-Replica/interactive/cluster_heatmap.html) |
 | ![Universe size by year](docs/img/universe_by_year.png) | **Real point-in-time S&P 500 membership size by year** (1996-2026), with how much of each year's universe this build has actually pulled real EDGAR facts for -- 298 of ~503 tickers as of 2026. (Adapted from "S&P 1500 overlap": this replica's universe source is S&P 500, not 1500 -- see Limitations.) [Open interactive version](https://mithranharsha.github.io/Factor-Zoo-Replica/interactive/universe_by_year.html) |
-| ![FF3 validation](docs/img/ff_validation.png) | **Real replica SMB/HML/MKT vs. Ken French's published series**, 115 real months of overlap. Market clears the 0.9 gate (r=0.92); HML is moderate (r=0.63), SMB is weak (r=0.11) -- a real, honest result, most likely from this replica's simplified large-cap breakpoint proxy and narrower (S&P-500-only) universe rather than a methodology bug (the market replication itself is near-perfect). [Open interactive version](https://mithranharsha.github.io/Factor-Zoo-Replica/interactive/ff_validation.html) |
-| ![Cumulative long-short returns](docs/img/cumulative_ls_returns.png) | **Real cumulative value-weighted long-short returns**, 2017-2026, for the 5 factors ranked highest by \|t\| (nothing cleared BH, so the ranked fallback applies -- see the funnel finding above). `return_on_assets` and `current_ratio` beat the replica's own real market return; `percent_operating_accruals` and `investment_to_capital` lost over half their value -- a real, visible example of a factor with the wrong sign (or no real signal) in this sample. [Open interactive version](https://mithranharsha.github.io/Factor-Zoo-Replica/interactive/cumulative_ls_returns.html) |
+| ![FF3 validation](docs/img/ff_validation.png) | **Real replica SMB/HML/MKT vs. Ken French's published series**, 115 real months of overlap. Market clears the 0.9 gate (r=0.93); HML is moderate (r=0.69), SMB is weak (r=0.17) -- a real, honest result. SMB's weakness is most likely the narrower (S&P-500-only) universe described in Limitations below, not a methodology bug (the market replication itself is near-perfect). [Open interactive version](https://mithranharsha.github.io/Factor-Zoo-Replica/interactive/ff_validation.html) |
+| ![Cumulative long-short returns](docs/img/cumulative_ls_returns.png) | **Real cumulative value-weighted long-short returns**, 2017-2026, for the 5 factors ranked highest by \|t\| (nothing cleared BH, so the ranked fallback applies -- see the funnel finding above). None of the 5 beat the replica's own real market return ($1 grew to $4.64); `investment_to_capital` and `share_turnover` lost over 70% of their value -- a real, visible example of factors with the wrong sign (or no real signal) in this sample. [Open interactive version](https://mithranharsha.github.io/Factor-Zoo-Replica/interactive/cumulative_ls_returns.html) |
 | ![Taming funnel](docs/img/taming_funnel.png) | **The headline finding** -- see above. [Open interactive version](https://mithranharsha.github.io/Factor-Zoo-Replica/interactive/taming_funnel.html) |
-| ![IPCA R-squared](docs/img/ipca_r2.png) | **Real IPCA fit** (K=1..6 latent factors, on one-per-correlation-cluster characteristics) vs. two real reference lines: a naive PCA-on-returns benchmark (R²=0.31-0.42, higher than IPCA's) and this replica's own return regressed on real FF5 (R²=0.33). IPCA's predictive R² is real and negative, a legitimate (if unflattering) result, not a bug. No q-factor reference line -- this project has no real q-factor data source, so it's omitted rather than estimated. [Open interactive version](https://mithranharsha.github.io/Factor-Zoo-Replica/interactive/ipca_r2.html) |
+| ![IPCA R-squared](docs/img/ipca_r2.png) | **Real IPCA fit** (K=1..6 latent factors, on one-per-correlation-cluster characteristics) vs. two real reference lines: a naive PCA-on-returns benchmark (R²=0.35-0.46, higher than IPCA's) and this replica's average long-short factor return regressed on real FF5 (R²=0.43, labeled on the chart as "avg factor return vs FF5" -- not a market return). IPCA's predictive R² is real and negative, a legitimate (if unflattering) result, not a bug. No q-factor reference line -- this project has no real q-factor data source, so it's omitted rather than estimated. [Open interactive version](https://mithranharsha.github.io/Factor-Zoo-Replica/interactive/ipca_r2.html) |
 
 Footer on every figure: generated by `make figures` from the commit stamped in its footer,
-data snapshot `2026-10-04` -- re-run after a new EDGAR/price pull to
+data snapshot `2026-11-23` -- re-run after a new EDGAR/price pull to
 refresh both the images and this stamp.
 
 The specific numbers quoted in the captions above (correlations, company
@@ -180,17 +180,39 @@ Live on GitHub Pages (open full-window; drag to rotate, scroll to zoom):
   exactly why the hurdle surface above requires such a high \|t\|.
 - **Index-based proxy universe, not a true historical constituent file.**
   The point-in-time universe is built from a historical S&P 500 membership
-  dataset (additions/removals both included, so it isn't naively
-  survivorship-biased), but it is still an *index* history, not raw
-  CRSP/Compustat coverage -- names that were never in the S&P 500 (most
-  small- and micro-caps, for the whole sample) are structurally absent.
-  This is almost certainly why SMB (the size factor) replicates Ken
-  French's series the weakest of the three FF3 factors: an S&P-500-only
-  universe has much less small-cap variation than the full market.
+  dataset (additions/removals both included), but it is still an *index*
+  history, not raw CRSP/Compustat coverage -- names that were never in the
+  S&P 500 (most small- and micro-caps, for the whole sample) are
+  structurally absent. This is almost certainly why SMB (the size factor)
+  replicates Ken French's series the weakest of the three FF3 factors: an
+  S&P-500-only universe has much less small-cap variation than the full
+  market.
+- **The company sample itself is still survivorship-biased, below the
+  universe layer.** The point-in-time membership history above (additions
+  AND removals, by date) is itself unbiased, and `run-backtest` filters
+  every month's cross-section against it -- a real bug fixed in this
+  build: every cross-section previously included every company this
+  project had ever pulled EDGAR data for, regardless of whether it was
+  actually an index member on that formation date. But `pull-edgar` only
+  ever resolves a ticker to a CIK via SEC's *current* `company_tickers.json`
+  -- a current-filers-only list -- so a company that left the S&P 500
+  before this build's pull (delisted, acquired, went bankrupt) was never
+  pulled in the first place and is structurally absent no matter which
+  date is being scored. In practice the 298-company sample is close to
+  "current S&P 500 members, alphabetically first," not a representative
+  slice across the full 1996-2026 membership history. This biases
+  distress and quality factors most, since the companies that would make
+  those factors work are disproportionately the ones missing. Fixing this
+  fully means pulling EDGAR/price data for historically-delisted names
+  too (bounded by Tiingo's 500-symbol/month free-tier cap); this build
+  doesn't yet do that.
 - **279 of 298 companies have real price history**, not all 298 -- the
   missing 19 are a free-tier Tiingo rate-limit/ticker-format gap (see the
-  *Live finding* above), not a structural limit. The backtest's 286-company
-  median per month already reflects this.
+  *Live finding* above), not a structural limit. The backtest's 220-company
+  median per month is lower than that 279, since it additionally applies
+  the point-in-time universe filter and the `min_price_usd`/
+  `min_months_of_history` universe filters from `configs/universe.yaml`
+  to every formation date, not just a one-time company-level gap.
 - **No WRDS/CRSP/Compustat subscription anywhere.** Every number above
   traces to SEC EDGAR, Tiingo/Yahoo, or the Ken French Data Library --
   see *Status* above for exactly which phase each source feeds.
@@ -273,7 +295,7 @@ docs/interactive/          # generated standalone interactive HTML (Plotly.js vi
 docker/Dockerfile
 .github/workflows/ci.yml, leakage-tests.yml
 Makefile                  # `make figures`
-configs/                  # universe.yaml, factors.yaml
+configs/                  # universe.yaml
 demo/factorzoo_demo.duckdb  # 35MB, 80-company real-data snapshot, committed on
                              # purpose -- app.py bootstraps a fresh deploy from
                              # it when no live database exists yet

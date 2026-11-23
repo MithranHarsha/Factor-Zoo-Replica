@@ -765,7 +765,7 @@ def ipca_r2(con: duckdb.DuckDBPyConnection) -> FigureResult:
                                   line={"color": MUTED, "width": 2, "dash": "dash"}, marker={"size": 7}))
     if ff5_r2 is not None:
         fig.add_hline(y=ff5_r2, line={"color": ACCENT_GREEN, "width": 1.5, "dash": "dot"},
-                       annotation_text=f"FF5 regression R²={ff5_r2:.2f}", annotation_font={"color": ACCENT_GREEN})
+                       annotation_text=f"Avg factor return vs FF5, R²={ff5_r2:.2f}", annotation_font={"color": ACCENT_GREEN})
 
     fig.update_layout(
         xaxis={"title": "K (number of latent factors)", "gridcolor": GRID, "color": TEXT, "dtick": 1},

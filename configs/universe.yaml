@@ -17,13 +17,12 @@ panel:
   rebalance_freq: "ME"  # month-end, matches the factor library's monthly/annual cadence
 
 # Minimum filters applied at formation date.
-# NOT YET ENFORCED as of Phase 1: price- and history-based filters need
-# daily price history, which is currently blocked for automated, no-key
-# pulls (see data/prices.py's module docstring -- both Stooq and Yahoo
-# returned errors live during this build). These parameters are recorded
-# here so Phase 3's portfolio construction has one place to read them from
-# once a working price source is wired in, rather than inventing the
-# numbers again later.
+# min_price_usd and min_months_of_history ARE enforced, in
+# backtest/run_backtest.py::build_cross_sections (loaded via
+# universe/filters.py::load_universe_filters). allowed_exchanges,
+# exclude_adrs and exclude_closed_end_funds are recorded but NOT enforced
+# -- this project has no exchange-listing or security-type data source to
+# check a ticker against, not an oversight that a later pass forgot.
 filters:
   min_price_usd: 1.0
   min_months_of_history: 24

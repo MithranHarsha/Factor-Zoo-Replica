@@ -182,6 +182,31 @@ class TestAttachMarketCap:
         assert row["price_at_formation"] == 10.0  # the March price, not June (which is after as_of)
         assert row["market_cap"] == pytest.approx(1000.0)
 
+    def test_market_cap_uses_unadjusted_close_not_split_adjusted_close(self, con):
+        # Regression test: shares outstanding from XBRL is the actual
+        # share count AS FILED at `as_of` -- pairing it with a
+        # split/dividend-adjusted close (which is retroactively rescaled
+        # for a split that happens AFTER `as_of`) understates market cap.
+        # A later 2:1 split rescales a $10 historical close down to $5 in
+        # the adjusted series; close_unadjusted must still carry the real
+        # $10 the stock actually traded at on that date.
+        self._setup_entity(con, shares=100.0)
+        pit_store.write_prices(
+            con,
+            pd.DataFrame(
+                [
+                    {"entity_id_hint": "AAA", "date": pd.Timestamp("2024-03-01"), "open": 9, "high": 11,
+                     "low": 9, "close": 5.0, "close_unadjusted": 10.0, "volume": 100},
+                ]
+            ),
+            source="test",
+        )
+        snapshot = build_point_in_time_snapshot(con, "2025-01-01")
+        result = attach_market_cap(con, snapshot, as_of="2024-04-15")
+        row = result[result["entity_id"] == "CIK0000000001"].iloc[0]
+        assert row["price_at_formation"] == 10.0  # the real traded price, not the split-adjusted 5.0
+        assert row["market_cap"] == pytest.approx(1000.0)  # not 500.0
+
     def test_price_after_as_of_is_not_used(self, con):
         self._setup_entity(con, shares=100.0)
         pit_store.write_prices(

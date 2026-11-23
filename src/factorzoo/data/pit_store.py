@@ -69,6 +69,7 @@ SCHEMA_STATEMENTS: tuple[str, ...] = (
         high DOUBLE,
         low DOUBLE,
         close DOUBLE,
+        close_unadjusted DOUBLE,
         volume DOUBLE,
         source VARCHAR,
         PRIMARY KEY (entity_id_hint, date, source)
@@ -156,6 +157,10 @@ def init_db(db_path: Path | None = None) -> duckdb.DuckDBPyConnection:
     con = duckdb.connect(str(db_path))
     for stmt in SCHEMA_STATEMENTS:
         con.execute(stmt)
+    # Migration for a prices_daily table created before close_unadjusted
+    # existed -- CREATE TABLE IF NOT EXISTS above won't add it to an
+    # already-existing table.
+    con.execute("ALTER TABLE prices_daily ADD COLUMN IF NOT EXISTS close_unadjusted DOUBLE")
     return con
 
 
@@ -248,7 +253,9 @@ def write_prices(con: duckdb.DuckDBPyConnection, df: pd.DataFrame, source: str) 
         return 0
     df = df.copy()
     df["source"] = source
-    cols = ["entity_id_hint", "date", "open", "high", "low", "close", "volume", "source"]
+    if "close_unadjusted" not in df.columns:
+        df["close_unadjusted"] = df["close"]
+    cols = ["entity_id_hint", "date", "open", "high", "low", "close", "close_unadjusted", "volume", "source"]
     con.register("_stage", df[cols])
     con.execute(
         "INSERT INTO prices_daily SELECT * FROM _stage "

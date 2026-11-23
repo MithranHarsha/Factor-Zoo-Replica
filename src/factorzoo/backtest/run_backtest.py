@@ -20,6 +20,7 @@ import numpy as np
 import pandas as pd
 
 import factorzoo.factors as f
+from factorzoo.data import pit_store
 from factorzoo.eval.benchmarks import ff3_series, validate_against_french
 from factorzoo.eval.performance import newey_west_tstat, sharpe_ratio
 from factorzoo.factors.momentum import attach_industry
@@ -35,6 +36,7 @@ from factorzoo.taming.dimension_reduction import (
     select_cluster_representatives,
 )
 from factorzoo.taming.multiple_testing import deflated_sharpe_ratio, multiple_testing_report
+from factorzoo.universe import filters as universe_filters
 
 FINANCIAL_SIC_RANGE = (6000, 6999)
 
@@ -78,7 +80,11 @@ def _attach_monthly_factor_values(con, monthly_panel: pd.DataFrame) -> pd.DataFr
 
 
 def build_cross_sections(
-    con, dates: list[pd.Timestamp], min_companies: int = 20
+    con,
+    dates: list[pd.Timestamp],
+    min_companies: int = 20,
+    min_price_usd: float | None = None,
+    min_months_of_history: int | None = None,
 ) -> dict[pd.Timestamp, pd.DataFrame]:
     """One real cross-section per formation date: every computable
     factor's value (annual ones point-in-time-correct via
@@ -87,6 +93,11 @@ def build_cross_sections(
     a decile sort formed at this date. Dates with fewer than
     `min_companies` scored names are dropped -- too thin a cross-section
     to sort into deciles meaningfully.
+
+    `min_price_usd`/`min_months_of_history` default to configs/universe.yaml's
+    `filters:` block when not given explicitly (None); pass 0 to disable
+    either filter, e.g. for a synthetic test fixture that doesn't need 24
+    months of price history to be meaningful.
     """
     # One ticker per entity_id, same tie-break as factors/panel.py's
     # attach_market_cap -- without this, a multi-class-share company
@@ -99,8 +110,20 @@ def build_cross_sections(
     ).fetchdf()
     monthly_panel = build_monthly_price_panel(con)
     monthly_panel["month"] = pd.to_datetime(monthly_panel["month"])
+    monthly_panel = monthly_panel.sort_values(["entity_id_hint", "month"])
+    # Cumulative count of months of price history available per ticker as
+    # of each row's month -- what the min_months_of_history universe
+    # filter below checks against.
+    monthly_panel["months_of_history"] = monthly_panel.groupby("entity_id_hint").cumcount() + 1
     monthly_panel = _attach_monthly_factor_values(con, monthly_panel)
     monthly_by_ticker_month = monthly_panel.set_index(["entity_id_hint", "month"])
+
+    if min_price_usd is None or min_months_of_history is None:
+        universe_filter_cfg = universe_filters.load_universe_filters()
+        if min_price_usd is None:
+            min_price_usd = universe_filter_cfg.get("min_price_usd", 0.0)
+        if min_months_of_history is None:
+            min_months_of_history = universe_filter_cfg.get("min_months_of_history", 0)
 
     annual_specs = [s for s in f.FACTOR_REGISTRY.values() if s.panel == "annual"]
     monthly_specs = [s for s in f.FACTOR_REGISTRY.values() if s.panel == "monthly"]
@@ -111,6 +134,16 @@ def build_cross_sections(
         if annual_panel.empty:
             continue
         annual_panel = annual_panel.merge(crosswalk, on="entity_id", how="left")
+        # Point-in-time universe filter: without this, every cross-section
+        # is silently "every company we've ever pulled EDGAR data for",
+        # regardless of whether it was actually an S&P 500 member on this
+        # formation date -- a company added to the index after `d`, or
+        # removed before it, would otherwise still be sorted into this
+        # date's deciles.
+        members = set(pit_store.get_universe_as_of(con, d))
+        annual_panel = annual_panel[annual_panel["ticker"].isin(members)]
+        if annual_panel.empty:
+            continue
         for spec in annual_specs:
             try:
                 annual_panel[spec.name] = spec.compute(annual_panel)
@@ -121,6 +154,24 @@ def build_cross_sections(
         next_period = cur_period + 1
         cur_month = cur_period.to_timestamp()
         next_month = next_period.to_timestamp()
+
+        # Universe filters from configs/universe.yaml: drop tickers below
+        # the minimum traded price or with too little price history as of
+        # this formation date -- see load_universe_filters's docstring for
+        # which filters this does (and doesn't) cover.
+        keep = []
+        for ticker in annual_panel["ticker"]:
+            try:
+                row = monthly_by_ticker_month.loc[(ticker, cur_month)]
+            except KeyError:
+                keep.append(False)
+                continue
+            price_ok = row["close_unadjusted_month_end"] >= min_price_usd
+            history_ok = row["months_of_history"] >= min_months_of_history
+            keep.append(bool(price_ok and history_ok))
+        annual_panel = annual_panel[keep]
+        if annual_panel.empty:
+            continue
 
         for spec in monthly_specs:
             values = []
@@ -158,8 +209,20 @@ def _exclude_financials(panel_by_date: dict, exclude: bool) -> dict:
     return out
 
 
-def run_full_backtest(con, dates: list[pd.Timestamp], min_companies: int = 20) -> BacktestResult:
-    panel_by_date = build_cross_sections(con, dates, min_companies=min_companies)
+def run_full_backtest(
+    con,
+    dates: list[pd.Timestamp],
+    min_companies: int = 20,
+    min_price_usd: float | None = None,
+    min_months_of_history: int | None = None,
+) -> BacktestResult:
+    panel_by_date = build_cross_sections(
+        con,
+        dates,
+        min_companies=min_companies,
+        min_price_usd=min_price_usd,
+        min_months_of_history=min_months_of_history,
+    )
     if not panel_by_date:
         raise RuntimeError(
             f"No formation date in range had >= {min_companies} scored companies -- "
@@ -230,7 +293,10 @@ def run_full_backtest(con, dates: list[pd.Timestamp], min_companies: int = 20) -
             lasso_survivors.append(candidate_name)
     taming["lasso_survives"] = taming.index.isin(lasso_survivors)
 
-    sharpes = vw_returns[tstats.index].apply(sharpe_ratio) * np.sqrt(12)  # annualized
+    # sharpe_ratio() already annualizes (periods_per_year=12 by default) --
+    # multiplying by sqrt(12) again here double-annualizes, inflating every
+    # Sharpe (and therefore every downstream DSR) by a factor of sqrt(12).
+    sharpes = vw_returns[tstats.index].apply(sharpe_ratio)
     n_obs_by_factor = vw_returns[tstats.index].notna().sum()
     dsr = {}
     for name in tstats.index:
@@ -344,13 +410,19 @@ def _run_ipca(con, panel_by_date: dict, characteristic_names: list[str], vw_retu
             ff5["date"] = pd.to_datetime(ff5["date"])
             ff5_monthly = ff5.set_index("date")[["mkt_rf", "smb", "hml", "rmw", "cma"]].resample("ME").apply(lambda s: (1 + s).prod() - 1)
             ff5_monthly.index = ff5_monthly.index.to_period("M").to_timestamp()
-            mkt_series = vw_returns.mean(axis=1).dropna()
-            joined = ff5_monthly.reindex(mkt_series.index).dropna()
+            # NOT a market return -- this is the cross-sectional average of
+            # EVERY factor's own long-short return series, regressed on
+            # FF5, as a rough "how much of this replica's factor activity
+            # does FF5 explain" reference line for the IPCA chart. See
+            # ipca_r2's figure caption in viz/readme_figures.py for the
+            # label this produces.
+            avg_factor_return = vw_returns.mean(axis=1).dropna()
+            joined = ff5_monthly.reindex(avg_factor_return.index).dropna()
             if len(joined) > 10:
                 import statsmodels.api as sm
 
                 X = sm.add_constant(joined.to_numpy())
-                y = mkt_series.reindex(joined.index).to_numpy()
+                y = avg_factor_return.reindex(joined.index).to_numpy()
                 model = sm.OLS(y, X).fit()
                 ff5_r2 = float(model.rsquared)
     except Exception:  # noqa: BLE001 -- the FF5 reference line is optional context, not required

@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from factorzoo.data.prices import (
+    PRICE_COLUMNS,
     TiingoBudget,
     _is_rate_limit_error,
     parse_stooq_csv,
@@ -23,7 +24,7 @@ class TestParseStooqCsv:
     def test_parses_expected_rows(self):
         df = parse_stooq_csv(STOOQ_SAMPLE, "aapl")
         assert len(df) == 2
-        assert list(df.columns) == ["entity_id_hint", "date", "open", "high", "low", "close", "volume"]
+        assert list(df.columns) == PRICE_COLUMNS
 
     def test_entity_id_hint_is_uppercased(self):
         df = parse_stooq_csv(STOOQ_SAMPLE, "aapl")
@@ -83,8 +84,16 @@ class TestParseTiingoJson:
 
     def test_no_duplicate_columns(self):
         df = parse_tiingo_json(TIINGO_SAMPLE, "aapl")
-        assert list(df.columns) == ["entity_id_hint", "date", "open", "high", "low", "close", "volume"]
+        assert list(df.columns) == PRICE_COLUMNS
         assert not df.columns.duplicated().any()
+
+    def test_close_unadjusted_is_the_raw_close_not_adjclose(self):
+        # TIINGO_SAMPLE's raw close (184.0) differs from its adjClose
+        # (185.5) -- close_unadjusted must carry the raw value through,
+        # since that's what market cap needs (see PRICE_COLUMNS).
+        df = parse_tiingo_json(TIINGO_SAMPLE, "aapl")
+        assert df.iloc[0]["close_unadjusted"] == 184.0
+        assert df.iloc[0]["close"] == 185.5
 
     def test_empty_payload_returns_empty_frame(self):
         df = parse_tiingo_json([], "ZZZZNOTREAL")
@@ -143,7 +152,12 @@ class TestParseYahooChartJson:
         # Same shape as parse_stooq_csv / parse_tiingo_json so downstream
         # code (pit_store.write_prices) never has to special-case a source.
         df = parse_yahoo_chart_json(YAHOO_SAMPLE, "aapl")
-        assert list(df.columns) == ["entity_id_hint", "date", "open", "high", "low", "close", "volume"]
+        assert list(df.columns) == PRICE_COLUMNS
+
+    def test_close_unadjusted_is_the_raw_close_not_adjclose(self):
+        df = parse_yahoo_chart_json(YAHOO_SAMPLE, "aapl")
+        assert df.iloc[0]["close_unadjusted"] == 185.5  # raw close
+        assert df.iloc[0]["close"] == 185.3  # adjclose
 
 
 class TestIsRateLimitError:
