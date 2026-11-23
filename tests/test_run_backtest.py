@@ -99,7 +99,7 @@ def _seed_synthetic_store(con, seed: int = 0) -> list[pd.Timestamp]:
 class TestBuildCrossSections:
     def test_returns_one_frame_per_scoreable_date(self, con):
         dates = _seed_synthetic_store(con)
-        panel_by_date = build_cross_sections(con, dates, min_companies=5)
+        panel_by_date = build_cross_sections(con, dates, min_companies=5, min_price_usd=0, min_months_of_history=0)
         assert len(panel_by_date) > 0
         for d, df in panel_by_date.items():
             assert d in dates
@@ -109,14 +109,49 @@ class TestBuildCrossSections:
 
     def test_too_few_companies_drops_the_date(self, con):
         dates = _seed_synthetic_store(con)
-        panel_by_date = build_cross_sections(con, dates, min_companies=1000)
+        panel_by_date = build_cross_sections(con, dates, min_companies=1000, min_price_usd=0, min_months_of_history=0)
         assert panel_by_date == {}
+
+    @pytest.mark.leakage
+    def test_excludes_a_ticker_not_in_the_universe_on_this_formation_date(self, con):
+        # Regression test: a company with real EDGAR/price data must still
+        # be excluded from a formation date's cross-section if it wasn't
+        # an actual universe (index) member on that date -- otherwise
+        # every cross-section is silently "every company ever pulled",
+        # not the point-in-time universe.
+        dates = _seed_synthetic_store(con)
+        con.execute("DELETE FROM universe_membership WHERE ticker = 'T00' AND formation_date = ?", [dates[0]])
+        panel_by_date = build_cross_sections(con, dates, min_companies=1, min_price_usd=0, min_months_of_history=0)
+        assert "T00" not in panel_by_date[dates[0]]["ticker"].tolist()
+        # Still a member on a later formation date -- only that one date's
+        # row was removed from universe_membership.
+        assert "T00" in panel_by_date[dates[1]]["ticker"].tolist()
+
+    def test_min_price_usd_drops_tickers_below_the_floor(self, con):
+        dates = _seed_synthetic_store(con)
+        panel_by_date = build_cross_sections(
+            con, dates, min_companies=1, min_price_usd=10_000, min_months_of_history=0
+        )
+        # Every synthetic ticker's price is well under $10,000 -- an
+        # unreachable floor must drop every date's cross-section entirely.
+        assert panel_by_date == {}
+
+    def test_min_months_of_history_drops_tickers_with_too_short_a_history(self, con):
+        dates = _seed_synthetic_store(con)
+        # The first formation date has exactly 1 month of price history
+        # behind it -- a 2-month floor must exclude every ticker there,
+        # while a later date (with more accumulated history) still passes.
+        panel_by_date = build_cross_sections(
+            con, dates, min_companies=1, min_price_usd=0, min_months_of_history=2
+        )
+        assert dates[0] not in panel_by_date
+        assert dates[-1] in panel_by_date
 
 
 class TestRunFullBacktest:
     def test_returns_well_formed_result_without_crashing(self, con):
         dates = _seed_synthetic_store(con)
-        result = run_full_backtest(con, dates, min_companies=5)
+        result = run_full_backtest(con, dates, min_companies=5, min_price_usd=0, min_months_of_history=0)
 
         assert isinstance(result, BacktestResult)
         assert len(result.dates) > 0
@@ -140,7 +175,7 @@ class TestRunFullBacktest:
         # on every return series this function produces must be shifted
         # one month forward from the formation dates passed in.
         dates = _seed_synthetic_store(con)
-        result = run_full_backtest(con, dates, min_companies=5)
+        result = run_full_backtest(con, dates, min_companies=5, min_price_usd=0, min_months_of_history=0)
         earned_months = {d.to_period("M") for d in result.factor_vw_returns.index}
         formation_months = {d.to_period("M") for d in dates}
         shifted_formation_months = {m + 1 for m in formation_months}
@@ -154,13 +189,13 @@ class TestRunFullBacktest:
     def test_raises_when_no_date_has_enough_companies(self, con):
         dates = _seed_synthetic_store(con)
         with pytest.raises(RuntimeError, match="nothing to backtest"):
-            run_full_backtest(con, dates, min_companies=1000)
+            run_full_backtest(con, dates, min_companies=1000, min_price_usd=0, min_months_of_history=0)
 
 
 class TestPersistBacktestResult:
     def test_writes_queryable_tables(self, con):
         dates = _seed_synthetic_store(con)
-        result = run_full_backtest(con, dates, min_companies=5)
+        result = run_full_backtest(con, dates, min_companies=5, min_price_usd=0, min_months_of_history=0)
         persist_backtest_result(con, result)
 
         n_returns = con.execute("SELECT COUNT(*) FROM factor_returns_monthly").fetchone()[0]
@@ -175,7 +210,7 @@ class TestPersistBacktestResult:
 
     def test_rerunning_replaces_rather_than_accumulates(self, con):
         dates = _seed_synthetic_store(con)
-        result = run_full_backtest(con, dates, min_companies=5)
+        result = run_full_backtest(con, dates, min_companies=5, min_price_usd=0, min_months_of_history=0)
         persist_backtest_result(con, result)
         n_first = con.execute("SELECT COUNT(*) FROM taming_report").fetchone()[0]
 

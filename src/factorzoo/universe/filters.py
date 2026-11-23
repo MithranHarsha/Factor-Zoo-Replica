@@ -22,8 +22,9 @@ from pathlib import Path
 
 import httpx
 import pandas as pd
+import yaml
 
-from factorzoo.config import CACHE_DIR
+from factorzoo.config import CACHE_DIR, CONFIGS_DIR
 
 SP500_HISTORY_URL = (
     "https://raw.githubusercontent.com/fja05680/sp500/master/sp500_ticker_start_end.csv"
@@ -94,6 +95,20 @@ def monthly_universe_panel(
         for ticker in point_in_time_members(history, d):
             rows.append({"formation_date": d, "ticker": ticker})
     return pd.DataFrame(rows)
+
+
+def load_universe_filters(config_path: Path | None = None) -> dict:
+    """Reads the `filters:` block from configs/universe.yaml (min_price_usd,
+    min_months_of_history, ...). Only min_price_usd and
+    min_months_of_history are actually enforced anywhere (see
+    backtest/run_backtest.py::build_cross_sections) -- allowed_exchanges,
+    exclude_adrs and exclude_closed_end_funds stay recorded-but-unenforced
+    here because this project has no exchange/security-type data source to
+    check them against, not because they were forgotten.
+    """
+    config_path = config_path or (CONFIGS_DIR / "universe.yaml")
+    raw = yaml.safe_load(config_path.read_text())
+    return raw.get("filters", {})
 
 
 def summarize_coverage(history: pd.DataFrame) -> dict:

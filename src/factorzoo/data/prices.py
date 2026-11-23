@@ -70,6 +70,13 @@ YAHOO_USER_AGENT = (
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 )
 
+# close_unadjusted is the actual traded price at that date (what
+# shares-outstanding x price market-cap needs); close is split/dividend
+# adjusted (what return calculations need) -- see attach_market_cap in
+# factors/panel.py for why conflating the two understates market cap for
+# any company that has ever split.
+PRICE_COLUMNS = ["entity_id_hint", "date", "open", "high", "low", "close", "close_unadjusted", "volume"]
+
 STOOQ_COLUMNS = {
     "Date": "date",
     "Open": "open",
@@ -114,12 +121,17 @@ def parse_stooq_csv(raw: str, ticker: str) -> pd.DataFrame:
     for a ticker it doesn't have, so that has to be checked explicitly
     rather than relying on an HTTP error."""
     if not raw or raw.strip().lower().startswith("no data") or "Date,Open" not in raw:
-        return pd.DataFrame(columns=["entity_id_hint", "date", "open", "high", "low", "close", "volume"])
+        return pd.DataFrame(columns=PRICE_COLUMNS)
     df = pd.read_csv(io.StringIO(raw))
     df = df.rename(columns=STOOQ_COLUMNS)
     df["date"] = pd.to_datetime(df["date"])
     df.insert(0, "entity_id_hint", ticker.upper())
-    return df[["entity_id_hint", "date", "open", "high", "low", "close", "volume"]]
+    # Stooq's single Close field isn't documented as raw vs. split/
+    # dividend-adjusted, and this source is currently blocked (see this
+    # module's docstring) -- close_unadjusted mirrors close rather than
+    # guessing at an adjustment this parser can't actually verify.
+    df["close_unadjusted"] = df["close"]
+    return df[PRICE_COLUMNS]
 
 
 def _is_rate_limit_error(exc: BaseException) -> bool:
@@ -220,14 +232,13 @@ def parse_yahoo_chart_json(payload: dict, ticker: str) -> pd.DataFrame:
     chart.error instead of a result, which is treated as "no data" rather
     than raised, matching how an unknown Stooq ticker is handled.
     """
-    cols = ["entity_id_hint", "date", "open", "high", "low", "close", "volume"]
     result = (payload or {}).get("chart", {}).get("result")
     if not result:
-        return pd.DataFrame(columns=cols)
+        return pd.DataFrame(columns=PRICE_COLUMNS)
     r = result[0]
     timestamps = r.get("timestamp")
     if not timestamps:
-        return pd.DataFrame(columns=cols)
+        return pd.DataFrame(columns=PRICE_COLUMNS)
     quote = r["indicators"]["quote"][0]
     adjclose = r["indicators"].get("adjclose", [{}])[0].get("adjclose")
     df = pd.DataFrame(
@@ -241,12 +252,15 @@ def parse_yahoo_chart_json(payload: dict, ticker: str) -> pd.DataFrame:
             # downstream return calculations don't have to special-case
             # the source.
             "close": adjclose if adjclose is not None else quote.get("close"),
+            # The actual traded close, kept separately -- see PRICE_COLUMNS'
+            # comment on why market cap needs this, not the adjusted field.
+            "close_unadjusted": quote.get("close"),
             "volume": quote.get("volume"),
         }
     )
     df = df.dropna(subset=["close"]).reset_index(drop=True)
     df.insert(0, "entity_id_hint", ticker.upper())
-    return df[cols]
+    return df[PRICE_COLUMNS]
 
 
 def fetch_tiingo_daily(
@@ -300,7 +314,7 @@ def fetch_tiingo_daily(
 
 def parse_tiingo_json(payload: list[dict], ticker: str) -> pd.DataFrame:
     if not payload:
-        return pd.DataFrame(columns=["entity_id_hint", "date", "open", "high", "low", "close", "volume"])
+        return pd.DataFrame(columns=PRICE_COLUMNS)
     df = pd.DataFrame(payload)
     df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None)
     # Tiingo returns BOTH raw and split/dividend-adjusted OHLCV in the same
@@ -321,7 +335,10 @@ def parse_tiingo_json(payload: list[dict], ticker: str) -> pd.DataFrame:
     )
     adjusted.insert(0, "date", df["date"])
     adjusted.insert(0, "entity_id_hint", ticker.upper())
-    return adjusted[["entity_id_hint", "date", "open", "high", "low", "close", "volume"]]
+    # The raw (not split/dividend-adjusted) close, kept separately -- see
+    # PRICE_COLUMNS' comment on why market cap needs this, not adjClose.
+    adjusted["close_unadjusted"] = df["close"]
+    return adjusted[PRICE_COLUMNS]
 
 
 class TiingoBudget:

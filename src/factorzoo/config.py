@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 load_dotenv()  # loads .env if present; real environment variables still win
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+CONFIGS_DIR = PROJECT_ROOT / "configs"
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DIR = DATA_DIR / "raw"
 CACHE_DIR = DATA_DIR / "cache"

@@ -195,6 +195,14 @@ def attach_market_cap(
     (book-to-market, EBITDA/EV, R&D-to-market, ...) -- those are the
     factors that genuinely need both a fundamentals panel and a price
     panel, not an artifact of this module's split.
+
+    Uses `close_unadjusted` (the actual traded price on `as_of`), not the
+    split/dividend-adjusted `close` -- shares outstanding from XBRL is the
+    actual share count as filed at that date, so pairing it with a price
+    that's been retroactively rescaled for splits that hadn't happened yet
+    understates market cap for any company that has split since (e.g.
+    Apple's 2014 7:1 and 2020 4:1 splits understate its pre-split market
+    cap by ~28x if adjusted close is used here instead).
     """
     if snapshot.empty:
         out = snapshot.copy()
@@ -218,7 +226,7 @@ def attach_market_cap(
     # for both real cases found so far that's also the unsuffixed, more
     # commonly quoted class).
     price_q = f"""
-        SELECT c.entity_id, p.close AS price_at_formation
+        SELECT c.entity_id, p.close_unadjusted AS price_at_formation
         FROM entity_crosswalk c
         JOIN prices_daily p ON p.entity_id_hint = c.ticker
         WHERE p.date = (
@@ -319,6 +327,7 @@ def build_monthly_price_panel(
                 entity_id_hint,
                 date,
                 close,
+                close_unadjusted,
                 volume,
                 close / NULLIF(LAG(close) OVER (PARTITION BY entity_id_hint ORDER BY date), 0) - 1 AS daily_return,
                 date_trunc('month', date) AS month
@@ -329,6 +338,7 @@ def build_monthly_price_panel(
             entity_id_hint,
             month,
             LAST(close ORDER BY date) AS close_month_end,
+            LAST(close_unadjusted ORDER BY date) AS close_unadjusted_month_end,
             AVG(volume) AS volume_avg,
             STDDEV_SAMP(daily_return) AS volatility_daily_std,
             MAX(daily_return) AS max_daily_return,
